@@ -87,7 +87,28 @@ public class TourService {
 
     @Transactional(readOnly = true)
     public List<Tour> findTours(Account account, LocalDate date) {
-        return tourRepository.findByDate(account, date);
+        // Charger les tours sans les commands pour éviter le produit cartésien
+        List<Tour> tours = tourRepository.findToursOptimizedByDate(account, date);
+        
+        if (!tours.isEmpty()) {
+            // Charger les commands séparément pour tous les tours
+            List<String> tourIds = tours.stream().map(Tour::getId).collect(java.util.stream.Collectors.toList());
+            List<bzh.stack.apimovix.model.Command> commands = tourRepository.findCommandsByTourIds(account, tourIds);
+            
+            // Grouper les commands par tour ID
+            java.util.Map<String, List<bzh.stack.apimovix.model.Command>> commandsByTourId = 
+                commands.stream().collect(java.util.stream.Collectors.groupingBy(
+                    command -> command.getTour().getId()
+                ));
+            
+            // Assigner les commands aux tours
+            tours.forEach(tour -> {
+                List<bzh.stack.apimovix.model.Command> tourCommands = commandsByTourId.getOrDefault(tour.getId(), new java.util.ArrayList<>());
+                tour.setCommands(tourCommands);
+            });
+        }
+        
+        return tours;
     }
 
     @Transactional(readOnly = true)

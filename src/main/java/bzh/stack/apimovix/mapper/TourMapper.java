@@ -37,6 +37,13 @@ public interface TourMapper {
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "status.profil", source = "lastHistoryStatus.profil", qualifiedByName = "toDto")
     @Mapping(target = "profil", source = "profil", qualifiedByName = "toDto")
+    @Mapping(target = "commands", ignore = true)
+    TourDTO toDtoLight(Tour tour);
+    
+    @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
+    @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
+    @Mapping(target = "status.profil", source = "lastHistoryStatus.profil", qualifiedByName = "toDto")
+    @Mapping(target = "profil", source = "profil", qualifiedByName = "toDto")
     TourDetailDTO toDetailDto(Tour tour);
     
     @Mapping(target = "id", source = "status.id")

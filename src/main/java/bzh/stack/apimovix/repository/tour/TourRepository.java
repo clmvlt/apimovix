@@ -17,6 +17,13 @@ public interface TourRepository extends JpaRepository<Tour, String> {
     @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.initialDate = :date AND t.account = :account ORDER BY t.name, c.tourOrder")
     List<Tour> findByDate(@Param("account") Account account, @Param("date") LocalDate date);
 
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.profil " +
+           "LEFT JOIN FETCH t.lastHistoryStatus " +
+           "WHERE t.initialDate = :date AND t.account = :account " +
+           "ORDER BY t.name")
+    List<Tour> findToursOptimizedByDate(@Param("account") Account account, @Param("date") LocalDate date);
+
     @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.initialDate BETWEEN :startDate AND :endDate AND t.account = :account ORDER BY t.initialDate, t.name, c.tourOrder")
     List<Tour> findByDateRange(@Param("account") Account account, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
@@ -28,4 +35,11 @@ public interface TourRepository extends JpaRepository<Tour, String> {
 
     @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.account = :account AND t.id IN :tourIds ORDER BY t.name, c.tourOrder")
     List<Tour> findAllByIdIn(@Param("account") Account account, @Param("tourIds") List<String> tourIds);
+
+    @Query("SELECT c FROM Command c " +
+           "LEFT JOIN FETCH c.pharmacy " +
+           "LEFT JOIN FETCH c.lastHistoryStatus " +
+           "WHERE c.tour.id IN :tourIds AND c.tour.account = :account " +
+           "ORDER BY c.tour.id, c.tourOrder")
+    List<bzh.stack.apimovix.model.Command> findCommandsByTourIds(@Param("account") Account account, @Param("tourIds") List<String> tourIds);
 }

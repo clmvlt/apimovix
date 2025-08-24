@@ -28,5 +28,6 @@ public class PharmacyCreateDTO {
     private String quality;
     private String first_name;
     private String last_name;
+    private String commentaire;
     private UUID zoneId;
 } 

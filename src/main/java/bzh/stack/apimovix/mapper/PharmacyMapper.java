@@ -50,6 +50,7 @@ public interface PharmacyMapper {
     @Mapping(target = "quality", source = "quality")
     @Mapping(target = "firstName", source = "first_name")
     @Mapping(target = "lastName", source = "last_name")
+    @Mapping(target = "commentaire", source = "commentaire")
     @Mapping(target = "neverOrdered", ignore = true)
     Pharmacy updateEntityFromDto(PharmacyUpdateDTO dto, @MappingTarget Pharmacy pharmacy);
 }

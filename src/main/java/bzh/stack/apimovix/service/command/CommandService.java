@@ -19,6 +19,7 @@ import bzh.stack.apimovix.dto.command.CommandUpdateDTO;
 import bzh.stack.apimovix.dto.command.CommandUpdateStatusDTO;
 import bzh.stack.apimovix.dto.command.CommandUpdateTarifDTO;
 import bzh.stack.apimovix.dto.importer.CommandImporterDTO;
+import bzh.stack.apimovix.mapper.CommandMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
@@ -56,6 +57,7 @@ public class CommandService {
     private final PackageStatusService packageStatusService;
     private final HistoryPackageStatusService historyPackageStatusService;
     private final AnomalieService anomalieService;
+    private final CommandMapper commandMapper;
 
     @Transactional(readOnly = true)
     public Optional<Command> findPharmacyCommandByDate(String cip, LocalDateTime date) {
@@ -285,7 +287,9 @@ public class CommandService {
 
     @Transactional(readOnly = true)
     public List<CommandExpeditionDTO> findExpeditionCommands(Account account, LocalDateTime date) {
-        return commandRepository.findExpeditionCommands(account, date);
+        LocalDateTime startDate = date.toLocalDate().atStartOfDay();
+        LocalDateTime endDate = startDate.plusDays(1);
+        return commandRepository.findExpeditionCommands(account, startDate, endDate);
     }
 
     public Optional<Command> findById(Account account, UUID id) {
@@ -352,15 +356,43 @@ public class CommandService {
         }
 
         String commandId = searchDTO.getCommandId();
+        
+        // Gestion des dates : si startDate est null, ignorer la recherche par date
+        LocalDateTime startDate = searchDTO.getStartDate();
+        LocalDateTime endDate = searchDTO.getEndDate();
+        
+        if (startDate != null && endDate == null) {
+            // Si seulement startDate est fournie, endDate = aujourd'hui
+            endDate = LocalDateTime.now().toLocalDate().atTime(23, 59, 59);
+        } else if (startDate == null) {
+            // Si startDate est null, ignorer complètement les filtres de date
+            endDate = null;
+        } else if (endDate != null) {
+            // Si endDate est fournie, s'assurer qu'elle inclut toute la journée
+            endDate = endDate.toLocalDate().atTime(23, 59, 59);
+        }
 
-        return commandRepository.searchCommands(
-                account,
-                name,
-                city,
-                searchDTO.getPharmacyCip(),
-                searchDTO.getPharmacyPostalCode(),
-                address,
-                commandId);
+        if (startDate == null) {
+            return commandRepository.searchCommandsWithoutDates(
+                    account,
+                    name,
+                    city,
+                    searchDTO.getPharmacyCip(),
+                    searchDTO.getPharmacyPostalCode(),
+                    address,
+                    commandId);
+        } else {
+            return commandRepository.searchCommandsWithDates(
+                    account,
+                    name,
+                    city,
+                    searchDTO.getPharmacyCip(),
+                    searchDTO.getPharmacyPostalCode(),
+                    address,
+                    commandId,
+                    startDate,
+                    endDate);
+        }
     }
 
     @Transactional

@@ -31,5 +31,6 @@ public class CommandDTO {
 
     private List<PackageDTO> packages = new ArrayList<>();
     private PharmacyDTO pharmacy;
+    private String pharmacyCommentaire;
     private CommandStatusDTO status;
 } 

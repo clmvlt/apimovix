@@ -36,6 +36,7 @@ public interface CommandMapper {
 
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
+    @Mapping(target = "pharmacyCommentaire", expression = "java(entity.getPharmacy() != null ? entity.getPharmacy().getCommentaire() : null)")
     @Named("toDTO")
     CommandDTO toDTO(Command entity);
 
@@ -49,6 +50,7 @@ public interface CommandMapper {
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "packagesNumber", expression = "java(entity.getPackages() != null ? entity.getPackages().size() : 0)")
+    @Mapping(target = "pharmacyCommentaire", expression = "java(entity.getPharmacy() != null ? entity.getPharmacy().getCommentaire() : null)")
     CommandExpeditionDTO toExpeditionDTO(Command entity);
     
     default List<CommandExpeditionDTO> toExpeditionDTOList(List<Command> entities) {

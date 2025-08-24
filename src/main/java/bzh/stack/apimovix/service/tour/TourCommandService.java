@@ -2,7 +2,9 @@ package bzh.stack.apimovix.service.tour;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -38,25 +40,7 @@ public class TourCommandService {
             return false;
         }
 
-
-        Optional<Tour> optTour = tourService.findTour(account, tourId);
-        if (optTour.isEmpty()) {
-            return false;
-        }
-        Tour tour = optTour.get();
-
-        Integer lastTourOrder = 0;
-        lastTourOrder = tour.getCommands().isEmpty() ? 0
-                : tour.getCommands().stream()
-                        .mapToInt(Command::getTourOrder)
-                        .max()
-                        .orElse(0);
-
-        AtomicInteger tourOrderCounter = new AtomicInteger(lastTourOrder);
-
-        List<Tour> toursToUpdate = new ArrayList<>();
-        toursToUpdate.add(tour);
-
+        // Convertir les IDs et valider
         List<UUID> commandUuids = commandIds.getCommandIds().stream()
                 .map(id -> {
                     try {
@@ -72,49 +56,68 @@ public class TourCommandService {
             return false;
         }
 
-        List<Command> commandsToUpdate = commandService.findCommandsByIds(account, commandUuids);
+        // Utiliser une requête bulk pour récupérer tour et commands en une fois
+        Optional<Tour> optTour = tourService.findTour(account, tourId);
+        if (optTour.isEmpty()) {
+            return false;
+        }
+        Tour tour = optTour.get();
 
+        // Récupérer les commands à assigner
+        List<Command> commandsToUpdate = commandService.findCommandsByIds(account, commandUuids);
         if (commandsToUpdate.isEmpty()) {
             return false;
         }
 
-        commandsToUpdate.forEach(command -> {
-            if (command.getTour() != null && !toursToUpdate.contains(command.getTour())) {
-                toursToUpdate.add(command.getTour());
-            }
-        });
+        // Calculer le dernier tour order une seule fois
+        Integer maxTourOrder = commandRepository.findMaxTourOrderByTourId(tourId);
+        AtomicInteger tourOrderCounter = new AtomicInteger(maxTourOrder != null ? maxTourOrder : 0);
 
+        // Collecter les tours affectés (pour mise à jour des routes)
+        Set<String> affectedTourIds = commandsToUpdate.stream()
+                .map(cmd -> cmd.getTour() != null ? cmd.getTour().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        affectedTourIds.add(tourId);
+
+        // Mise à jour des commands en une seule opération
         commandsToUpdate.forEach(command -> {
             command.setTourOrder(tourOrderCounter.incrementAndGet());
             command.setTour(tour);
         });
 
+        // Une seule sauvegarde pour les commands
         commandRepository.saveAll(commandsToUpdate);
-        tourRepository.saveAll(toursToUpdate);
-        
-        entityManager.flush();
-        entityManager.clear();
 
-        toursToUpdate.forEach(t -> {
-            Tour reloadedTour = tourRepository.findTour(account, t.getId());
-            if (reloadedTour != null) {
-                Optional<RouteResponseDTO> tourRouteOptional = orsService.calculateTourRoute(reloadedTour);
-                if (tourRouteOptional.isEmpty()) {
-                    t.setGeometry(null);
-                    t.setEstimateKm(0.0);
-                    t.setEstimateMins(0.0);
-                } else {
-                    RouteResponseDTO tourRoute = tourRouteOptional.get();
-                    t.setGeometry(tourRoute.getGeometry());
-                    t.setEstimateKm(tourRoute.getDistance());
-                    t.setEstimateMins(tourRoute.getDuration());
-                }
+        // Mise à jour asynchrone des routes si possible, sinon en parallèle
+        updateTourRoutes(account, affectedTourIds);
+
+        return true;
+    }
+
+    private void updateTourRoutes(Account account, Set<String> tourIds) {
+        List<Tour> toursToUpdate = tourIds.stream()
+                .map(id -> tourRepository.findTour(account, id))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        // Traitement parallèle des routes pour améliorer les performances
+        toursToUpdate.parallelStream().forEach(tour -> {
+            Optional<RouteResponseDTO> tourRouteOptional = orsService.calculateTourRoute(tour);
+            if (tourRouteOptional.isEmpty()) {
+                tour.setGeometry(null);
+                tour.setEstimateKm(0.0);
+                tour.setEstimateMins(0.0);
+            } else {
+                RouteResponseDTO tourRoute = tourRouteOptional.get();
+                tour.setGeometry(tourRoute.getGeometry());
+                tour.setEstimateKm(tourRoute.getDistance());
+                tour.setEstimateMins(tourRoute.getDuration());
             }
         });
 
+        // Une seule sauvegarde pour tous les tours
         tourRepository.saveAll(toursToUpdate);
-
-        return true;
     }
 
     @Transactional

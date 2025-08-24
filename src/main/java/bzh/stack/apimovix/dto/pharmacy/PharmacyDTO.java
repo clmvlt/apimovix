@@ -26,6 +26,7 @@ public class PharmacyDTO {
     private String firstName;
     private String lastName;
     private Boolean neverOrdered;
+    private String commentaire;
     private ZoneDTO zone;
 
     public PharmacyDTO(Pharmacy pharmacy) {
@@ -47,6 +48,7 @@ public class PharmacyDTO {
         this.firstName = pharmacy.getFirstName();
         this.lastName = pharmacy.getLastName();
         this.neverOrdered = pharmacy.getNeverOrdered();
+        this.commentaire = pharmacy.getCommentaire();
     }
 
     public PharmacyDTO(String cip, String name, String address, String city, String postalCode, Double latitude, Double longitude) {

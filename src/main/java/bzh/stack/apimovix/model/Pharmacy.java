@@ -77,6 +77,9 @@ public class Pharmacy {
     @Column(name = "never_ordered")
     private Boolean neverOrdered = true;
 
+    @Column(name = "commentaire")
+    private String commentaire;
+
     @OneToMany(mappedBy = "pharmacy", fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<PharmacyPicture> pictures = new ArrayList<>();
@@ -107,6 +110,7 @@ public class Pharmacy {
         this.quality = recipientDTO.getQuality();
         this.firstName = recipientDTO.getFirst_name();
         this.lastName = recipientDTO.getLast_name();
+        this.commentaire = recipientDTO.getCommentaire();
     }
 
     @JsonIgnore

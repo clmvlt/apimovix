@@ -22,7 +22,7 @@ import bzh.stack.apimovix.model.Picture.PharmacyInfosPicture;
 @Service
 public class PictureService {
 
-    @Value("${app.upload.dir:/home/user/spring_boot_test/uploads}")
+    @Value("${app.upload.dir:D:/3_PROJET/Movix/_apimovix/uploads}")
     private String uploadDir;
 
     private String cleanBase64String(String base64Image) {

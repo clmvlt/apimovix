@@ -25,6 +25,7 @@ public class PharmacyUpdateDTO {
     private String quality;
     private String first_name;
     private String last_name;
+    private String commentaire;
 
     @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.INVALID_FORMAT_UUID)
     private UUID zoneId;
