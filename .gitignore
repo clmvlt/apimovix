@@ -6,6 +6,7 @@ target/
 uploads
 logs
 src/main/resources/application.properties
+upload.py
 
 ### STS ###
 .apt_generated

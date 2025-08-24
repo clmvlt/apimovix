@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class FileService {
 
-    @Value("${app.upload.dir:/home/user/spring_boot_test/uploads}")
+    @Value("${app.upload.dir:D:uploads}")
     private String uploadDir;
 
     public String saveApkFile(byte[] apkBytes, String version) {

@@ -20,4 +20,5 @@ public class CommandValidateLoadingDTO {
     private CommandStatusDTO status;
 
     private List<PackageDTO> packages;
+    private String comment;
 } 

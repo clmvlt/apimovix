@@ -57,7 +57,6 @@ public class CommandService {
     private final PackageStatusService packageStatusService;
     private final HistoryPackageStatusService historyPackageStatusService;
     private final AnomalieService anomalieService;
-    private final CommandMapper commandMapper;
 
     @Transactional(readOnly = true)
     public Optional<Command> findPharmacyCommandByDate(String cip, LocalDateTime date) {
@@ -161,22 +160,12 @@ public class CommandService {
      * @param profil Le profil qui effectue l'action
      * @param command La commande concernée
      * @param status Le statut de commande appliqué
+     * @param isWeb Si true, ne génère pas d'anomalie
+     * @param comment Commentaire à ajouter à l'anomalie
      */
-    private void createAnomalieIfNeeded(Profil profil, Command command, CommandStatus status) {
-        String anomalieDescription = null;
-        
-        switch (status.getId()) {
-            case 7: 
-                anomalieDescription = "Colis manquant lors du chargement - Statut: Non chargé - MANQUANT";
-                break;
-            case 8:
-                anomalieDescription = "Pharmacie inaccessible lors de la livraison - Statut: Non livré - Inaccessible";
-                break;
-            case 9:
-                anomalieDescription = "Instructions de livraison invalides - Statut: Non livré - Instructions invalides";
-                break;
-            default:
-                return; 
+    private void createAnomalieIfNeeded(Profil profil, Command command, CommandStatus status, Boolean isWeb, String comment) {
+        if (isWeb != null && isWeb) {
+            return;
         }
         
         if (command.getPharmacy() != null) {
@@ -184,8 +173,8 @@ public class CommandService {
                 AnomalieCreateDTO anomalieCreateDTO = new AnomalieCreateDTO();
                 anomalieCreateDTO.setCip(command.getPharmacy().getCip());
                 anomalieCreateDTO.setCode("other");
-                anomalieCreateDTO.setOther(anomalieDescription);
-                anomalieCreateDTO.setActions("Anomalie créée automatiquement lors du changement de statut de commande");
+                anomalieCreateDTO.setOther(comment != null ? comment : "Aucun commentaire ajouté");
+                anomalieCreateDTO.setActions("Retour à l'expéditeur");
                 
                 if (command.getPackages() != null && !command.getPackages().isEmpty()) {
                     List<String> barcodes = command.getPackages().stream()
@@ -203,6 +192,11 @@ public class CommandService {
 
     @Transactional
     public Command updateCommandStatus(Profil profil, CommandStatus status, Command command) {
+        return updateCommandStatus(profil, status, command, null, null);
+    }
+
+    @Transactional
+    public Command updateCommandStatus(Profil profil, CommandStatus status, Command command, Boolean isWeb, String comment) {
         HistoryCommandStatus historyCommandStatus = historyCommandStatusService.createHistoryCommandStatus(command,
                 profil, status);
         command.setLastHistoryStatus(historyCommandStatus);
@@ -218,8 +212,8 @@ public class CommandService {
             }
         }
         
-        // Créer une anomalie automatique si nécessaire (statuts 7, 8, 9)
-        createAnomalieIfNeeded(profil, command, status);
+        // Créer une anomalie automatique si nécessaire (statuts 4, 7, 8, 9)
+        createAnomalieIfNeeded(profil, command, status, isWeb, comment);
         
         return commandRepository.save(command);
     }
@@ -272,8 +266,8 @@ public class CommandService {
                 }
             }
             
-            // Créer une anomalie automatique si nécessaire (statuts 7, 8, 9)
-            createAnomalieIfNeeded(profil, command, status);
+            // Créer une anomalie automatique si nécessaire (statuts 4, 7, 8, 9)
+            createAnomalieIfNeeded(profil, command, status, commandUpdateStatusDTO.getIsWeb(), commandUpdateStatusDTO.getComment());
         }
 
         commandRepository.saveAll(commandsToUpdate);

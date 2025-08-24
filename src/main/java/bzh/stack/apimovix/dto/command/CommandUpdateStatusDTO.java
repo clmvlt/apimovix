@@ -31,4 +31,6 @@ public class CommandUpdateStatusDTO {
 
     private Double latitude;
     private Double longitude;
+    private Boolean isWeb;
+    private String comment;
 }

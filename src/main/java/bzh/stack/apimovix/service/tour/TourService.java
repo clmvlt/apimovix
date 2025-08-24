@@ -266,7 +266,7 @@ public class TourService {
                     Optional<CommandStatus> commandStatus = commandStatusService
                             .findCommandStatus(commandDTO.getStatus().getId());
                     if (commandStatus.isPresent()) {
-                        commandService.updateCommandStatus(profil, commandStatus.get(), command.get());
+                        commandService.updateCommandStatus(profil, commandStatus.get(), command.get(), false, commandDTO.getComment());
                     }
                 }
             }
