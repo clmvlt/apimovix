@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 
+import bzh.stack.apimovix.interceptor.RequestLoggingInterceptor;
 import bzh.stack.apimovix.interceptor.TokenInterceptor;
 import bzh.stack.apimovix.util.PATTERNS;
 
@@ -29,6 +30,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Autowired
     private TokenInterceptor tokenInterceptor;
+    
+    @Autowired
+    private RequestLoggingInterceptor requestLoggingInterceptor;
 
     @Bean
     public ObjectMapper objectMapper() {
@@ -56,6 +60,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(requestLoggingInterceptor);
         registry.addInterceptor(tokenInterceptor);
     }
 

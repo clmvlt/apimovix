@@ -71,7 +71,10 @@ public class PackageService {
         } else {
             packageEntity = new PackageEntity();
         }
-        packageEntity.setZoneName(command.getPharmacy().getZone().getName());
+        String zoneName = (command.getPharmacy().getZone() != null) 
+            ? command.getPharmacy().getZone().getName() 
+            : null;
+        packageEntity.setZoneName(zoneName);
         packageEntity.setCommand(command);
         packageEntity.setCNumTransport(numTransport);
         String newBarcode = generateNewBarcode(command.getPharmacy().getPostalCode());
