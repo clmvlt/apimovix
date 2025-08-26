@@ -28,4 +28,19 @@ public class TourUpdateDTO {
     private Double estimateMins;
     private Double estimateKm;
     private String geometry;
+    
+    // Helper method to check if immat should be cleared
+    public boolean shouldClearImmat() {
+        return immat != null && (immat.trim().isEmpty() || "null".equalsIgnoreCase(immat.trim()));
+    }
+    
+    // Helper method to check if startKm should be cleared
+    public boolean shouldClearStartKm() {
+        return startKm != null && startKm.equals(-1);
+    }
+    
+    // Helper method to check if endKm should be cleared
+    public boolean shouldClearEndKm() {
+        return endKm != null && endKm.equals(-1);
+    }
 } 

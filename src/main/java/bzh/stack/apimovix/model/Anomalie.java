@@ -22,11 +22,19 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Index;
 import lombok.Data;
 
 @Data
 @Entity
-@Table(name = "anomalie")
+@Table(name = "anomalie", 
+       indexes = {
+           @Index(name = "idx_anomalie_account_created", columnList = "id_account, created_at DESC"),
+           @Index(name = "idx_anomalie_pharmacy", columnList = "cip"),
+           @Index(name = "idx_anomalie_profil", columnList = "id_profil"),
+           @Index(name = "idx_anomalie_type", columnList = "code"),
+           @Index(name = "idx_anomalie_created", columnList = "created_at DESC")
+       })
 public class Anomalie {
     
     @Id

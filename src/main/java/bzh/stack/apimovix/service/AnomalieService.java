@@ -9,6 +9,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +51,13 @@ public class AnomalieService {
     @Transactional(readOnly = true)
     public List<Anomalie> findAnomalies(Account account) {
         return anomalieRepository.findAnomalies(account);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Anomalie> findAnomaliesPaginated(Account account, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Anomalie> anomaliePage = anomalieRepository.findAnomaliesPaginated(account, pageRequest);
+        return anomaliePage.getContent();
     }
 
     @Transactional(readOnly = true)

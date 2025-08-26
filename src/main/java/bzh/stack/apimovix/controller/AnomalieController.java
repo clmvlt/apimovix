@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import bzh.stack.apimovix.annotation.MobileRequired;
@@ -53,12 +54,21 @@ public class AnomalieController {
     private final PdfGeneratorService pdfGeneratorService;
 
     @GetMapping
-    @Operation(summary = "Get all anomalies", description = "Retrieves a list of all anomalies associated with the authenticated user's account", responses = {
+    @Operation(summary = "Get all anomalies", description = "Retrieves a list of all anomalies associated with the authenticated user's account with optional pagination", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved list of anomalies", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = AnomalieDTO.class)))),
     })
-    public ResponseEntity<?> getAnomalies(HttpServletRequest request) {
+    public ResponseEntity<?> getAnomalies(
+            HttpServletRequest request,
+            @Parameter(description = "Page number (0-indexed, default: 0)")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size (default: 100, max: 500)")
+            @RequestParam(defaultValue = "100") int size) {
         Profil profil = (Profil) request.getAttribute("profil");
-        List<Anomalie> anomalies = anomalieService.findAnomalies(profil.getAccount());
+        
+        // Limiter la taille max pour éviter les abus
+        size = Math.min(size, 500);
+        
+        List<Anomalie> anomalies = anomalieService.findAnomaliesPaginated(profil.getAccount(), page, size);
         return MAPIR.ok(anomalieMapper.toAnomalieDTOsList(anomalies));
     }
 

@@ -19,7 +19,6 @@ import bzh.stack.apimovix.dto.command.CommandUpdateDTO;
 import bzh.stack.apimovix.dto.command.CommandUpdateStatusDTO;
 import bzh.stack.apimovix.dto.command.CommandUpdateTarifDTO;
 import bzh.stack.apimovix.dto.importer.CommandImporterDTO;
-import bzh.stack.apimovix.mapper.CommandMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
@@ -168,13 +167,28 @@ public class CommandService {
             return;
         }
         
+        Integer statusId = status.getId();
+        boolean shouldCreateAnomalie = statusId == 4 || 
+                                       statusId == 5 || 
+                                       statusId == 6 || 
+                                       statusId == 7 || 
+                                       statusId == 8 || 
+                                       statusId == 9;
+        if (!shouldCreateAnomalie) {
+            return;
+        }
+        
         if (command.getPharmacy() != null) {
             try {
                 AnomalieCreateDTO anomalieCreateDTO = new AnomalieCreateDTO();
                 anomalieCreateDTO.setCip(command.getPharmacy().getCip());
-                anomalieCreateDTO.setCode("other");
-                anomalieCreateDTO.setOther(comment != null ? comment : "Aucun commentaire ajouté");
-                anomalieCreateDTO.setActions("Retour à l'expéditeur");
+                
+                String code = "other";
+                String actions = "Retour à l'expéditeur";
+                
+                anomalieCreateDTO.setCode(code);
+                anomalieCreateDTO.setOther(status.getName() + ". " + (comment != null ? comment : "Aucun commentaire ajouté"));
+                anomalieCreateDTO.setActions(actions);
                 
                 if (command.getPackages() != null && !command.getPackages().isEmpty()) {
                     List<String> barcodes = command.getPackages().stream()
@@ -207,7 +221,15 @@ public class CommandService {
             Optional<PackageStatus> packageStatus = packageStatusService.findPackageStatus(packageStatusId);
             if (packageStatus.isPresent()) {
                 for (PackageEntity packageEntity : command.getPackages()) {
-                    packageService.updatePackageStatus(profil, packageStatus.get(), packageEntity);
+                    // Vérifier si le statut actuel du package est différent du nouveau statut
+                    boolean packageStatusDifferent = packageEntity.getLastHistoryStatus() == null || 
+                                                     packageEntity.getLastHistoryStatus().getStatus() == null ||
+                                                     !packageEntity.getLastHistoryStatus().getStatus().getId().equals(packageStatus.get().getId());
+                    
+                    // Ne mettre à jour que si le statut est différent
+                    if (packageStatusDifferent) {
+                        packageService.updatePackageStatus(profil, packageStatus.get(), packageEntity);
+                    }
                 }
             }
         }
@@ -260,9 +282,17 @@ public class CommandService {
             
             if (packageStatus.isPresent() && command.getPackages() != null) {
                 for (PackageEntity packageEntity : command.getPackages()) {
-                    HistoryPackageStatus historyPackageStatus = historyPackageStatusService.createHistoryPackageStatus(packageEntity, profil, packageStatus.get());
-                    packageEntity.setLastHistoryStatus(historyPackageStatus);
-                    packagesToUpdate.add(packageEntity);
+                    // Vérifier si le statut actuel du package est différent du nouveau statut
+                    boolean packageStatusDifferent = packageEntity.getLastHistoryStatus() == null || 
+                                                     packageEntity.getLastHistoryStatus().getStatus() == null ||
+                                                     !packageEntity.getLastHistoryStatus().getStatus().getId().equals(packageStatus.get().getId());
+                    
+                    // Ne mettre à jour que si le statut est différent
+                    if (packageStatusDifferent) {
+                        HistoryPackageStatus historyPackageStatus = historyPackageStatusService.createHistoryPackageStatus(packageEntity, profil, packageStatus.get());
+                        packageEntity.setLastHistoryStatus(historyPackageStatus);
+                        packagesToUpdate.add(packageEntity);
+                    }
                 }
             }
             

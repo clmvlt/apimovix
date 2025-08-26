@@ -152,14 +152,29 @@ public class TourService {
         if (tourUpdate.getName() != null) {
             tour.setName(tourUpdate.getName());
         }
+        // Handle immat - can be set to null via empty string or "null" value
         if (tourUpdate.getImmat() != null) {
-            tour.setImmat(tourUpdate.getImmat());
+            if (tourUpdate.shouldClearImmat()) {
+                tour.setImmat(null);
+            } else {
+                tour.setImmat(tourUpdate.getImmat());
+            }
         }
+        // Handle startKm - use -1 as sentinel value to set to null
         if (tourUpdate.getStartKm() != null) {
-            tour.setStartKm(tourUpdate.getStartKm());
+            if (tourUpdate.shouldClearStartKm()) {
+                tour.setStartKm(null);
+            } else {
+                tour.setStartKm(tourUpdate.getStartKm());
+            }
         }
+        // Handle endKm - use -1 as sentinel value to set to null
         if (tourUpdate.getEndKm() != null) {
-            tour.setEndKm(tourUpdate.getEndKm());
+            if (tourUpdate.shouldClearEndKm()) {
+                tour.setEndKm(null);
+            } else {
+                tour.setEndKm(tourUpdate.getEndKm());
+            }
         }
         if (tourUpdate.getInitialDate() != null) {
             tour.setInitialDate(tourUpdate.getInitialDate());

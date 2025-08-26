@@ -5,10 +5,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,29 +35,21 @@ public class PharmacyService {
     private final PharmacyInfosPictureRepository pharmacyInfosPictureRepository;
     private final PictureService pictureService;
     private final ZoneRepository zoneRepository;
-    private final CacheManager cacheManager;
 
     public PharmacyService(
             PharmacyRepository pharmacyRepository,
             PharmacyPictureRepository pharmacyPictureRepository,
             PharmacyInfosPictureRepository pharmacyInfosPictureRepository,
             PictureService pictureService,
-            @Qualifier("pharmaciesCacheManager") CacheManager cacheManager, PharmacyMapper pharmacyMapper, ZoneRepository zoneRepository) {
+            PharmacyMapper pharmacyMapper, ZoneRepository zoneRepository) {
         this.pharmacyRepository = pharmacyRepository;
         this.pharmacyPictureRepository = pharmacyPictureRepository;
         this.pharmacyInfosPictureRepository = pharmacyInfosPictureRepository;
         this.pictureService = pictureService;
-        this.cacheManager = cacheManager;
         this.pharmacyMapper = pharmacyMapper;
         this.zoneRepository = zoneRepository;
     }
 
-    private void clearTourCacheByDate(String cip) {
-        Cache cache = cacheManager.getCache("pharmacies");
-        if (cache != null) {
-            cache.evict(cip);
-        }
-    }
 
     @Transactional(readOnly = true)
     public List<Pharmacy> findPharmacies() {
@@ -69,7 +57,6 @@ public class PharmacyService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "pharmacies", key = "#cip", unless = "#result == null", cacheManager = "pharmaciesCacheManager")
     public Optional<Pharmacy> findPharmacy(String cip) {
         return Optional.ofNullable(pharmacyRepository.findPharmacy(cip));
     }
@@ -119,7 +106,6 @@ public class PharmacyService {
     public PharmacyPicture createPharmacyPicture(Pharmacy pharmacy, String base64Image) {
         String fileName = pictureService.savePharmacyImage(pharmacy, base64Image);
         PharmacyPicture picture = null;
-        clearTourCacheByDate(pharmacy.getCip());
 
         if (fileName != null) {
             try {
@@ -148,7 +134,6 @@ public class PharmacyService {
         if (pictureToDelete == null) {
             return false;
         }
-        clearTourCacheByDate(pharmacy.getCip());
 
         boolean deleted = pictureService.deleteImage(pictureToDelete.getName());
         if (deleted) {
@@ -161,7 +146,6 @@ public class PharmacyService {
 
     @Transactional
     public Pharmacy save(Pharmacy pharmacy) {
-        clearTourCacheByDate(pharmacy.getCip());
         return pharmacyRepository.save(pharmacy);
     }
 
@@ -189,7 +173,6 @@ public class PharmacyService {
         if (optPharmacy.isEmpty()) {
             return Optional.empty();
         }
-        clearTourCacheByDate(cip);
         Pharmacy pharmacy = optPharmacy.get();
         pharmacyMapper.updateEntityFromDto(pharmacyUpdateDTO, pharmacy);
         if (pharmacyUpdateDTO.getZoneId() != null) {
@@ -217,8 +200,7 @@ public class PharmacyService {
             }
 
             pharmacyRepository.delete(pharmacy);
-            clearTourCacheByDate(cip);
-            return true;
+                return true;
 
         } catch (Exception e) {
             return false;
@@ -245,7 +227,6 @@ public class PharmacyService {
             return null;
         }
 
-        clearTourCacheByDate(pharmacy.getCip());
 
         try {
             PharmacyPicture picture = new PharmacyPicture();
