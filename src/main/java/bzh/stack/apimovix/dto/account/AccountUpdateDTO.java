@@ -13,7 +13,11 @@ public class AccountUpdateDTO {
     private Double latitude;
     
     private Double longitude;
-    
+
+    private Integer maxProfiles;
+
+    private Boolean isActive;
+
     private String anomaliesEmails;
     
     // Configuration SMTP
@@ -24,5 +28,9 @@ public class AccountUpdateDTO {
     private Boolean smtpEnable;
     private Boolean smtpUseTls;
     private Boolean smtpUseSsl;
+    
+    private Boolean isScanCIP;
+
+    private Boolean autoSendAnomalieEmails;
 
 } 

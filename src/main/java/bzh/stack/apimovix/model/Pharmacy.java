@@ -47,7 +47,7 @@ public class Pharmacy {
     @Column(name = "country")
     private String country;
 
-    @Column(name = "informations")
+    @Column(name = "informations", length = 4000)
     private String informations;
 
     @Column(name = "phone")
@@ -77,7 +77,7 @@ public class Pharmacy {
     @Column(name = "never_ordered")
     private Boolean neverOrdered = true;
 
-    @Column(name = "commentaire")
+    @Column(name = "commentaire", length = 4000)
     private String commentaire;
 
     @OneToMany(mappedBy = "pharmacy", fetch = FetchType.EAGER)

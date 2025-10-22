@@ -1,5 +1,6 @@
 package bzh.stack.apimovix.controller;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -60,6 +61,7 @@ public class PharmacyController {
     private final PharmacyService pharmacyService;
     private final TourService tourService;
     private final PharmacyMapper pharmacyMapper;
+    private final bzh.stack.apimovix.service.PdfGeneratorService pdfGeneratorService;
 
     @GetMapping
     @Operation(summary = "Get all pharmacies", description = "Retrieves a list of all pharmacies in the system", responses = {
@@ -217,5 +219,28 @@ public class PharmacyController {
         LocalDate endLocalDate = LocalDate.parse(endDate, formatter);
         List<PharmacyOrderStatsDTO> stats = tourService.getPharmacyOrderStats(profil.getAccount(), startLocalDate, endLocalDate);
         return MAPIR.ok(stats);
+    }
+
+    @PostMapping(value = "/{cip}/label", produces = {MediaType.APPLICATION_PDF_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "Generate pharmacy label with barcode", description = "Generates a PDF label with the account logo, pharmacy name and CIP barcode", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully generated pharmacy label", content = @Content(mediaType = MediaType.APPLICATION_PDF_VALUE, schema = @Schema(type = "string", format = "binary"))),
+            @ApiResponse(responseCode = "404", description = "Pharmacy not found", content = @Content),
+            @ApiResponse(responseCode = "406", description = "Not Acceptable - Client must accept application/pdf", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error while generating label", content = @Content)
+    })
+    public ResponseEntity<?> generatePharmacyLabel(
+            ServletRequest request,
+            @Parameter(description = "CIP code of the pharmacy", required = true) @PathVariable String cip) {
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
+        if (pharmacy.isEmpty()) {
+            return MAPIR.notFound();
+        }
+
+        try {
+            byte[] pdfBytes = pdfGeneratorService.generatePharmacyLabel(pharmacy.get());
+            return MAPIR.pdf(pdfBytes, "pharmacy-label-" + cip + ".pdf");
+        } catch (IOException e) {
+            return MAPIR.internalServerError();
+        }
     }
 }

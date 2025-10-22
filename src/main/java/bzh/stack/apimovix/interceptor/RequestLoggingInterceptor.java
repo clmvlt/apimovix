@@ -36,6 +36,11 @@ public class RequestLoggingInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, @Nullable Exception ex) throws Exception {
+        // Skip logging for routes containing "logs"
+        if (request.getRequestURI().contains("logs")) {
+            return;
+        }
+
         String authorization = request.getHeader("Authorization");
         String token = authorization != null ? authorization.replace("Bearer ", "") : "no-token";
         

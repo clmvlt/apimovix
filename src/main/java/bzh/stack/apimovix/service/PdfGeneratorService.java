@@ -41,6 +41,7 @@ import com.itextpdf.layout.element.Image;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
+import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.Tarif;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.service.picture.PictureService;
@@ -973,5 +974,147 @@ public class PdfGeneratorService {
                 currentY -= lineSpacing;
             }
         }
+    }
+
+    /**
+     * Génère un PDF d'étiquette avec le logo de l'account, le nom de la pharmacie et le CIP en code-barres
+     * Format adapté pour imprimante d'étiquettes (62x100mm)
+     *
+     * @param pharmacy La pharmacie pour laquelle générer le label
+     * @return Les octets du PDF généré
+     * @throws IOException En cas d'erreur lors de la génération
+     */
+    public byte[] generatePharmacyLabel(Pharmacy pharmacy) throws IOException {
+        // Format étiquette 41x89mm
+        float width = 252.283f;  // 89mm en points
+        float height = 116.220f; // 41mm en points
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+        PdfDocument pdf = new PdfDocument(writer);
+        Document document = new Document(pdf, new PageSize(width, height));
+        document.setMargins(0, 0, 0, 0);
+
+        PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+
+        PdfCanvas canvas = new PdfCanvas(pdf.addNewPage());
+
+        float margin = 5;
+        float yPosition = height;
+
+        // Section 1: Logo centré en haut
+        float logoSectionHeight = 40;
+        try {
+            File logoFile = pictureService.findImageFile("logos/logo.png");
+            if (logoFile != null && logoFile.exists()) {
+                byte[] imageBytes = java.nio.file.Files.readAllBytes(logoFile.toPath());
+                Image logo = new Image(ImageDataFactory.create(imageBytes));
+
+                // Limiter la taille du logo adapté au nouveau format
+                logo.scaleToFit(140, 35);
+
+                // Centrer horizontalement en haut avec marge réduite
+                float logoX = (width - logo.getImageScaledWidth()) / 2;
+                float logoY = height - logo.getImageScaledHeight() - 3;
+                logo.setFixedPosition(logoX, logoY);
+                document.add(logo);
+            }
+        } catch (Exception e) {
+            // Si le logo ne peut pas être chargé, on continue sans
+        }
+        yPosition -= logoSectionHeight;
+
+        // Section 2: Nom de la pharmacie (zone réduite)
+        String pharmacyName = pharmacy.getName();
+        float maxTextWidth = width - (2 * margin);
+        float maxNameSectionHeight = 40;
+
+        // Police adaptée au nouveau format
+        float fontSize = 16;
+        float textWidth = fontBold.getWidth(pharmacyName) * fontSize / 1000;
+
+        // Réduire si nécessaire
+        while (textWidth > maxTextWidth && fontSize > 12) {
+            fontSize -= 0.5f;
+            textWidth = fontBold.getWidth(pharmacyName) * fontSize / 1000;
+        }
+
+        canvas.setFillColor(ColorConstants.BLACK);
+
+        // Si le texte est trop long, le découper sur plusieurs lignes
+        if (textWidth > maxTextWidth) {
+            String[] words = pharmacyName.split(" ");
+            StringBuilder currentLine = new StringBuilder();
+            float lineHeight = fontSize * 1.15f;
+            java.util.List<String> lines = new java.util.ArrayList<>();
+
+            for (String word : words) {
+                String testLine = currentLine.length() > 0 ? currentLine + " " + word : word;
+                float testWidth = fontBold.getWidth(testLine) * fontSize / 1000;
+
+                if (testWidth > maxTextWidth && currentLine.length() > 0) {
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder(word);
+                } else {
+                    currentLine.append(currentLine.length() > 0 ? " " : "").append(word);
+                }
+            }
+            if (currentLine.length() > 0) {
+                lines.add(currentLine.toString());
+            }
+
+            // Centrer verticalement le bloc de texte
+            float totalTextHeight = lines.size() * lineHeight;
+            float textStartY = yPosition - (maxNameSectionHeight - totalTextHeight) / 2;
+
+            // Dessiner chaque ligne centrée
+            for (String line : lines) {
+                float lineWidth = fontBold.getWidth(line) * fontSize / 1000;
+                float lineX = (width - lineWidth) / 2;
+                canvas.setFontAndSize(fontBold, fontSize);
+                canvas.beginText();
+                canvas.moveText(lineX, textStartY);
+                canvas.showText(line);
+                canvas.endText();
+                textStartY -= lineHeight;
+            }
+        } else {
+            // Dessiner sur une seule ligne, parfaitement centré
+            float textX = (width - textWidth) / 2;
+            float textY = yPosition - (maxNameSectionHeight - fontSize) / 2;
+            canvas.setFontAndSize(fontBold, fontSize);
+            canvas.beginText();
+            canvas.moveText(textX, textY);
+            canvas.showText(pharmacyName);
+            canvas.endText();
+        }
+        yPosition -= maxNameSectionHeight;
+
+        // Section 3: Code-barres adapté au nouveau format
+        float barcodeMarginLR = 10; // Marges gauche et droite réduites
+        float barcodeMarginBottom = 6; // Marge en bas réduite
+
+        Barcode128 barcode = new Barcode128(pdf);
+        barcode.setCode(pharmacy.getCip());
+        barcode.setCodeType(Barcode128.CODE128);
+        barcode.setFont(null);
+
+        // Adapter la hauteur au nouveau format plus petit
+        barcode.setBarHeight(15); // Hauteur des barres réduite
+        barcode.setX(0.75f); // Largeur des barres optimisée
+
+        Image barcodeImage = new Image(barcode.createFormXObject(pdf));
+        float barcodeWidth = width - (2 * barcodeMarginLR);
+        barcodeImage.setWidth(barcodeWidth);
+        barcodeImage.setAutoScale(false);
+
+        // Positionner avec marges à gauche, droite et bas
+        float barcodeX = barcodeMarginLR;
+        float barcodeY = barcodeMarginBottom;
+        barcodeImage.setFixedPosition(barcodeX, barcodeY);
+        document.add(barcodeImage);
+
+        document.close();
+        return baos.toByteArray();
     }
 }

@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import bzh.stack.apimovix.dto.anomalie.AnomalieCreateDTO;
+import bzh.stack.apimovix.dto.anomalie.AnomalieEmailDTO;
 import bzh.stack.apimovix.dto.anomalie.AnomalieSearchDTO;
+import bzh.stack.apimovix.dto.anomalie.AnomalieUpdateDTO;
 import bzh.stack.apimovix.mapper.AnomalieMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Anomalie;
@@ -156,10 +158,12 @@ public class AnomalieService {
         savedAnomalie.setPictures(pictures);
         
         final Anomalie finalAnomalie = anomalieRepository.save(savedAnomalie);
-        
-        // Envoyer l'email de notification de manière asynchrone
-        sendAnomalieEmailAsync(finalAnomalie);
-        
+
+        // Envoyer l'email de notification de manière asynchrone seulement si l'envoi automatique est activé
+        if (profil.getAccount().getAutoSendAnomalieEmails() != null && profil.getAccount().getAutoSendAnomalieEmails()) {
+            sendAnomalieEmailAsync(finalAnomalie);
+        }
+
         return Optional.of(finalAnomalie);
     }
 
@@ -173,6 +177,48 @@ public class AnomalieService {
             emailService.sendAnomalieNotificationEmail(anomalie, pdfBytes);
         } catch (Exception e) {
             // Erreur silencieuse pour ne pas bloquer la création de l'anomalie
+        }
+    }
+
+    @Transactional
+    public Optional<Anomalie> updateAnomalie(Account account, UUID id, AnomalieUpdateDTO updateDTO) {
+        Optional<Anomalie> anomalieOpt = findAnomalie(account, id);
+        if (anomalieOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Anomalie anomalie = anomalieOpt.get();
+        anomalie.setOther(updateDTO.getComment());
+
+        return Optional.of(anomalieRepository.save(anomalie));
+    }
+
+    @Transactional
+    public boolean sendAnomalieEmail(Account account, UUID id, AnomalieEmailDTO emailDTO) {
+        Optional<Anomalie> anomalieOpt = findAnomalie(account, id);
+        if (anomalieOpt.isEmpty()) {
+            return false;
+        }
+
+        try {
+            Anomalie anomalie = anomalieOpt.get();
+            byte[] pdfBytes = pdfGeneratorService.generateAnomaliePdf(anomalie);
+
+            List<String> recipients;
+            if (emailDTO.getEmails() != null && !emailDTO.getEmails().isEmpty()) {
+                recipients = emailDTO.getEmails();
+            } else {
+                if (account.getAnomaliesEmails() != null && !account.getAnomaliesEmails().trim().isEmpty()) {
+                    recipients = List.of(account.getAnomaliesEmails().split("[;,]"));
+                } else {
+                    return false;
+                }
+            }
+
+            emailService.sendAnomalieNotificationEmail(anomalie, pdfBytes, recipients);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

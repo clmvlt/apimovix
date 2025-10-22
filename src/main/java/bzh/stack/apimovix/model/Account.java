@@ -84,6 +84,12 @@ public class Account {
     @Column(name = "smtp_use_ssl", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean smtpUseSsl = false;
     
+    @Column(name = "is_scan_cip", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean isScanCIP = false;
+
+    @Column(name = "auto_send_anomalie_emails", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean autoSendAnomalieEmails = false;
+    
 
     
     @OneToMany(mappedBy = "account")

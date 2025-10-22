@@ -23,6 +23,8 @@ public class CommandUpdateDTO {
 
     private String comment;
 
+    private Boolean isForced;
+
     @NotEmpty(message = GLOBAL.CANNOT_BE_EMPTY)
     @NotNull(message = GLOBAL.REQUIRED)
     @Valid

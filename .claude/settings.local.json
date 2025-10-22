@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(./mvnw:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(taskkill:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

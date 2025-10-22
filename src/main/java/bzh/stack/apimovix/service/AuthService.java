@@ -21,7 +21,7 @@ public class AuthService {
     private final ProfileRepository profilRepository;
 
     public Optional<Profil> login(LoginRequestDTO creds) {
-        String identifiant = creds.getIdentifiant().toLowerCase();
+        String identifiant = creds.getIdentifiant();
         Optional<Profil> profilOpt = profilRepository.findByEmail(identifiant);
 
         if (profilOpt.isEmpty()) {

@@ -33,4 +33,8 @@ public class CommandUpdateStatusDTO {
     private Double longitude;
     private Boolean isWeb;
     private String comment;
+
+    public boolean getIsWeb() {
+        return isWeb != null && isWeb;
+    }
 }

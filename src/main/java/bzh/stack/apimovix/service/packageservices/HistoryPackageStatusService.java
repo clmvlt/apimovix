@@ -27,4 +27,9 @@ public class HistoryPackageStatusService {
         historyPackageStatus.setStatus(status);
         return historyPackageStatusRepository.save(historyPackageStatus);
     }
+
+    @Transactional
+    public void deleteByPackage(PackageEntity packageEntity) {
+        historyPackageStatusRepository.deleteByPackageEntity(packageEntity);
+    }
 } 

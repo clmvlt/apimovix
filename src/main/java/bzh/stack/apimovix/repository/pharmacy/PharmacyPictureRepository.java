@@ -1,5 +1,7 @@
 package bzh.stack.apimovix.repository.pharmacy;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,4 +15,8 @@ import bzh.stack.apimovix.model.Picture.PharmacyPicture;
 public interface PharmacyPictureRepository extends JpaRepository<PharmacyPicture, UUID> {
     @Query("SELECT p FROM PharmacyPicture p WHERE p.pharmacy.cip = :cip AND p.id = :id")
     PharmacyPicture findPicture(@Param("cip") String cip , @Param("id") UUID id );
+
+    List<PharmacyPicture> findByCreatedAtBefore(LocalDateTime cutoffDate);
+
+    long countByCreatedAtBefore(LocalDateTime cutoffDate);
 } 

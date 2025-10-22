@@ -5,6 +5,7 @@ import java.util.UUID;
 import bzh.stack.apimovix.util.GLOBAL;
 import bzh.stack.apimovix.util.PATTERNS;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -16,7 +17,10 @@ public class PharmacyUpdateDTO {
     private String postal_code;
     private String city;
     private String country;
+
+    @Size(max = 4000, message = "Les informations ne peuvent pas dépasser 4000 caractères")
     private String informations;
+
     private String phone;
     private String fax;
     private String email;
@@ -25,6 +29,8 @@ public class PharmacyUpdateDTO {
     private String quality;
     private String first_name;
     private String last_name;
+    
+    @Size(max = 4000, message = "Le commentaire ne peut pas dépasser 4000 caractères")
     private String commentaire;
 
     @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.INVALID_FORMAT_UUID)

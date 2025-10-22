@@ -6,16 +6,21 @@ import java.util.Optional;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import bzh.stack.apimovix.annotation.HyperAdminRequired;
 import bzh.stack.apimovix.annotation.MobileRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
+import bzh.stack.apimovix.dto.packageentity.PackageChangeCommandDTO;
+import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageStatusDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageUpdateStatusDTO;
 import bzh.stack.apimovix.mapper.PackageMapper;
@@ -49,6 +54,19 @@ public class PackageController {
     private final PackageMapper packageMapper;
     private final PdfGeneratorService pdfGeneratorService;
     private final PackageService packageService;
+
+    @GetMapping
+    @Operation(summary = "Search packages by barcode pattern (HyperAdmin only)", description = "Retrieves all packages containing the specified barcode pattern. Requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved packages", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = PackageDTO.class)))),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> searchPackages(
+            @Parameter(description = "Barcode pattern to search for (searches for packages containing this string)", required = true) @RequestParam String barcode) {
+        List<PackageEntity> packages = packageService.findPackagesByBarcodePattern(barcode);
+        return MAPIR.ok(packages.stream()
+                .map(packageMapper::toDto)
+                .collect(java.util.stream.Collectors.toList()));
+    }
 
     @GetMapping("/history/{barcode}")
     @Operation(summary = "Get package history", description = "Retrieves the complete history of status changes for a specific package using its barcode", responses = {
@@ -101,5 +119,36 @@ public class PackageController {
         } catch (IOException e) {
             return MAPIR.internalServerError();
         }
+    }
+
+    @DeleteMapping("/{barcode}")
+    @Operation(summary = "Delete package (HyperAdmin only)", description = "Deletes a package and all its related data including history. This operation is irreversible and requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "204", description = "Package successfully deleted", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Package not found", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> deletePackage(
+            @Parameter(description = "Barcode of the package to delete", required = true) @PathVariable String barcode) {
+        boolean deleted = packageService.deletePackage(barcode);
+        if (!deleted) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.noContent();
+    }
+
+    @PutMapping("/{barcode}/command")
+    @Operation(summary = "Change package command (HyperAdmin only)", description = "Changes the command (id_command) associated with a package. Requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "204", description = "Package command successfully updated", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Package or command not found", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> changePackageCommand(
+            @Parameter(description = "Barcode of the package to update", required = true) @PathVariable String barcode,
+            @Parameter(description = "New command ID data", required = true, schema = @Schema(implementation = PackageChangeCommandDTO.class)) @Valid @RequestBody PackageChangeCommandDTO dto) {
+        boolean updated = packageService.changePackageCommand(barcode, dto.getNewCommandId());
+        if (!updated) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.noContent();
     }
 }

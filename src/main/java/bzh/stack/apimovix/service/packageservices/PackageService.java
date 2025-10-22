@@ -3,6 +3,7 @@ package bzh.stack.apimovix.service.packageservices;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.History.HistoryPackageStatus;
 import bzh.stack.apimovix.model.StatusType.PackageStatus;
+import bzh.stack.apimovix.repository.command.CommandRepository;
 import bzh.stack.apimovix.repository.packagerepository.PackageRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +30,8 @@ public class PackageService {
     private final PackageMapper packageMapper;
     private final HistoryPackageStatusService historyPackageStatusService;
     private final PackageStatusService packageStatusService;
-    
+    private final CommandRepository commandRepository;
+
     private final Random random = new Random();
 
     public String generateBarcode() {
@@ -144,5 +147,57 @@ public class PackageService {
     @Transactional(readOnly = true)
     public List<PackageEntity> findPackagesByBarcodes(Account account, List<String> barcodes) {
         return packageRepository.findAllByIdIn(account, barcodes);
+    }
+
+    @Transactional
+    public boolean deletePackage(String barcode) {
+        Optional<PackageEntity> optPackage = packageRepository.findById(barcode);
+        if (optPackage.isEmpty()) {
+            return false;
+        }
+
+        PackageEntity packageEntity = optPackage.get();
+
+        // Delete all history records associated with this package
+        historyPackageStatusService.deleteByPackage(packageEntity);
+
+        // Delete the package itself
+        packageRepository.delete(packageEntity);
+
+        return true;
+    }
+
+    @Transactional
+    public boolean changePackageCommand(String barcode, UUID newCommandId) {
+        Optional<PackageEntity> optPackage = packageRepository.findById(barcode);
+        if (optPackage.isEmpty()) {
+            return false;
+        }
+
+        Optional<Command> optCommand = commandRepository.findById(newCommandId);
+        if (optCommand.isEmpty()) {
+            return false;
+        }
+
+        PackageEntity packageEntity = optPackage.get();
+        Command newCommand = optCommand.get();
+
+        // Update the zone name based on new command's pharmacy
+        String zoneName = (newCommand.getPharmacy().getZone() != null)
+            ? newCommand.getPharmacy().getZone().getName()
+            : null;
+        packageEntity.setZoneName(zoneName);
+
+        // Update the command reference
+        packageEntity.setCommand(newCommand);
+
+        packageRepository.save(packageEntity);
+
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public List<PackageEntity> findPackagesByBarcodePattern(String barcodePattern) {
+        return packageRepository.findByBarcodeContaining(barcodePattern);
     }
 } 

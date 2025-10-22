@@ -6,24 +6,38 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import bzh.stack.apimovix.enums.PictureENUM;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInfos;
+import bzh.stack.apimovix.model.Picture.AnomaliePicture;
+import bzh.stack.apimovix.model.Picture.CommandPicture;
 import bzh.stack.apimovix.model.Picture.PharmacyInfosPicture;
+import bzh.stack.apimovix.repository.anomalie.AnomaliePictureRepository;
+import bzh.stack.apimovix.repository.command.CommandPictureRepository;
 
 @Service
 public class PictureService {
 
     @Value("${app.upload.dir:D:/3_PROJET/Movix/_apimovix/uploads}")
     private String uploadDir;
+
+    @Autowired
+    private AnomaliePictureRepository anomaliePictureRepository;
+
+    @Autowired
+    private CommandPictureRepository commandPictureRepository;
 
     private String cleanBase64String(String base64Image) {
         if (base64Image.contains("base64,")) {
@@ -147,4 +161,49 @@ public class PictureService {
             return null;
         }
     }
+
+    // Date de coupure fixe pour assurer la cohérence
+    private static final int MONTHS_OLD = 3;
+
+    private LocalDateTime getCutoffDate() {
+        // Utiliser la même méthode de calcul pour les deux opérations
+        return LocalDateTime.now().minusMonths(MONTHS_OLD).withHour(0).withMinute(0).withSecond(0).withNano(0);
+    }
+
+    public long getOldCommandPicturesCount() {
+        LocalDateTime cutoffDate = getCutoffDate();
+        long anomalieCount = anomaliePictureRepository.countByCreatedAtBefore(cutoffDate);
+        long commandCount = commandPictureRepository.countByCreatedAtBefore(cutoffDate);
+        return anomalieCount + commandCount;
+    }
+
+    @Transactional
+    public int deleteOldCommandPictures() {
+        LocalDateTime cutoffDate = getCutoffDate();
+        int deletedCount = 0;
+        List<AnomaliePicture> oldAnomaliePictures = anomaliePictureRepository.findByCreatedAtBefore(cutoffDate);
+        for (AnomaliePicture picture : oldAnomaliePictures) {
+            try {
+                anomaliePictureRepository.delete(picture);
+                deletedCount++;
+
+                deleteImage(picture.getName());
+            } catch (Exception e) {
+            }
+        }
+
+        List<CommandPicture> oldCommandPictures = commandPictureRepository.findByCreatedAtBefore(cutoffDate);
+        for (CommandPicture picture : oldCommandPictures) {
+            try {
+                commandPictureRepository.delete(picture);
+                deletedCount++;
+
+                deleteImage(picture.getName());
+            } catch (Exception e) {
+            }
+        }
+
+        return deletedCount;
+    }
+
 } 

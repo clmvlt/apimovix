@@ -32,7 +32,7 @@ public class PharmacyInfos {
     @Column(name = "id")
     private UUID id;
     
-    @Column(name = "commentaire", columnDefinition = "TEXT")
+    @Column(name = "commentaire", columnDefinition = "TEXT", length = 4000)
     private String commentaire;
     
     @Column(name = "invalid_geocodage")

@@ -22,4 +22,7 @@ public interface PackageRepository extends JpaRepository<PackageEntity, String> 
 
     @Query("SELECT p FROM PackageEntity p WHERE p.command.sender.account = :account AND p.barcode IN :barcodes")
     List<PackageEntity> findAllByIdIn(@Param("account") Account account, @Param("barcodes") List<String> barcodes);
+
+    @Query("SELECT DISTINCT p FROM PackageEntity p LEFT JOIN FETCH p.command c LEFT JOIN FETCH c.pharmacy ph WHERE p.barcode LIKE %:barcodePattern%")
+    List<PackageEntity> findByBarcodeContaining(@Param("barcodePattern") String barcodePattern);
 } 

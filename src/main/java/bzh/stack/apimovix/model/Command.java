@@ -76,6 +76,9 @@ public class Command {
     @Column(name = "tarif")
     private Double tarif;
 
+    @Column(name = "is_forced")
+    private Boolean isForced = false;
+
     @ManyToOne
     @JoinColumn(name = "id_tour")
     @JsonBackReference

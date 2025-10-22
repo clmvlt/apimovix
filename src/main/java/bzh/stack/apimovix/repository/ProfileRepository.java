@@ -12,10 +12,10 @@ import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Profil;
 
 public interface ProfileRepository extends JpaRepository<Profil, UUID> {
-    @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE p.email = :email AND (p.deleted IS NULL OR p.deleted = false)")
+    @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE LOWER(p.email) = LOWER(:email) AND (p.deleted IS NULL OR p.deleted = false)")
     public Optional<Profil> findByEmail(String email);
     
-    @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE p.identifiant = :identifiant AND (p.deleted IS NULL OR p.deleted = false)")
+    @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE LOWER(p.identifiant) = LOWER(:identifiant) AND (p.deleted IS NULL OR p.deleted = false)")
     public Optional<Profil> findByIdentifiant(String identifiant);
     
     @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE p.token = :token AND (p.deleted IS NULL OR p.deleted = false)")

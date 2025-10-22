@@ -26,4 +26,6 @@ public class AccountDTO {
     private Double longitude;
     private Integer maxProfiles;
     private String anomaliesEmails;
+    private Boolean isScanCIP;
+    private Boolean autoSendAnomalieEmails;
 }

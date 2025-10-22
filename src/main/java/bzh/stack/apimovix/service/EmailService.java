@@ -444,20 +444,32 @@ public class EmailService {
     public void sendAnomalieNotificationEmail(Anomalie anomalie, byte[] pdfBytes) {
         try {
             Account account = anomalie.getAccount();
-            
+
             // Vérifier si des emails sont configurés pour les anomalies
             if (account.getAnomaliesEmails() == null || account.getAnomaliesEmails().trim().isEmpty()) {
                 return;
             }
-            
+
             // Diviser les emails (séparés par des virgules ou points-virgules)
             String[] emailList = account.getAnomaliesEmails().split("[;,]");
-            
+            List<String> emails = List.of(emailList);
+
+            sendAnomalieNotificationEmail(anomalie, pdfBytes, emails);
+
+        } catch (Exception e) {
+            // Erreur silencieuse
+        }
+    }
+
+    public void sendAnomalieNotificationEmail(Anomalie anomalie, byte[] pdfBytes, List<String> customEmails) {
+        try {
+            Account account = anomalie.getAccount();
+
             String title = "Nouvelle anomalie signalée - " + anomalie.getTypeAnomalie().getName();
             String message = generateAnomalieEmailMessage(anomalie);
-            
-            // Envoyer l'email à chaque adresse configurée
-            for (String email : emailList) {
+
+            // Envoyer l'email à chaque adresse fournie
+            for (String email : customEmails) {
                 email = email.trim();
                 if (!email.isEmpty()) {
                     try {
@@ -471,7 +483,7 @@ public class EmailService {
                     }
                 }
             }
-            
+
         } catch (Exception e) {
             // Erreur silencieuse
         }

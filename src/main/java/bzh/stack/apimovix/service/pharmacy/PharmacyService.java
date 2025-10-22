@@ -76,11 +76,51 @@ public class PharmacyService {
             }
         }
 
+        String cityAlias = null;
         if (city != null) {
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (city.toLowerCase().contains(alias.getKey())) {
-                    city = city.toLowerCase().replace(alias.getKey(), alias.getValue());
-                    break;
+            String cityLower = city.toLowerCase().trim();
+
+            if (cityLower.startsWith("st ") || cityLower.startsWith("st-")) {
+                cityAlias = cityLower.replaceFirst("^st([\\s-])", "saint$1");
+            } else if (cityLower.equals("st")) {
+                cityAlias = "saint";
+            } else if (cityLower.startsWith("saint ") || cityLower.startsWith("saint-")) {
+                cityAlias = cityLower.replaceFirst("^saint([\\s-])", "st$1");
+            } else if (cityLower.equals("saint")) {
+                cityAlias = "st";
+            } else if (cityLower.startsWith("ste ") || cityLower.startsWith("ste-")) {
+                cityAlias = cityLower.replaceFirst("^ste([\\s-])", "sainte$1");
+            } else if (cityLower.equals("ste")) {
+                cityAlias = "sainte";
+            } else if (cityLower.startsWith("sainte ") || cityLower.startsWith("sainte-")) {
+                cityAlias = cityLower.replaceFirst("^sainte([\\s-])", "ste$1");
+            } else if (cityLower.equals("sainte")) {
+                cityAlias = "ste";
+            }
+
+            if (cityAlias == null) {
+                String[] parts = cityLower.split("\\s+");
+                if (parts.length > 1) {
+                    boolean modified = false;
+                    for (int i = 0; i < parts.length; i++) {
+                        String part = parts[i];
+                        if (part.equals("st") || part.equals("st-")) {
+                            parts[i] = part.replace("st", "saint");
+                            modified = true;
+                        } else if (part.equals("saint") || part.equals("saint-")) {
+                            parts[i] = part.replace("saint", "st");
+                            modified = true;
+                        } else if (part.equals("ste") || part.equals("ste-")) {
+                            parts[i] = part.replace("ste", "sainte");
+                            modified = true;
+                        } else if (part.equals("sainte") || part.equals("sainte-")) {
+                            parts[i] = part.replace("sainte", "ste");
+                            modified = true;
+                        }
+                    }
+                    if (modified) {
+                        cityAlias = String.join(" ", parts);
+                    }
                 }
             }
         }
@@ -94,12 +134,20 @@ public class PharmacyService {
             }
         }
 
+        Integer maxResults = pharmacySearchDTO.getMax();
+        if (maxResults == null || maxResults <= 0) {
+            maxResults = 200; // Default value
+        }
+
         return pharmacyRepository.searchPharmacies(
                 name,
                 city,
+                cityAlias,
                 pharmacySearchDTO.getPostalCode(),
                 pharmacySearchDTO.getCip(),
-                address);
+                address,
+                pharmacySearchDTO.getIsLocationValid(),
+                maxResults);
     }
 
     @Transactional
@@ -215,7 +263,7 @@ public class PharmacyService {
         }
 
         PharmacyInfosPicture pharmacyInfosPicture = optPharmacyInfosPicture.get();
-        
+
         // Vérifier que la photo appartient à une PharmacyInfos de la même pharmacie
         if (!pharmacyInfosPicture.getPharmacyInfos().getPharmacy().getCip().equals(pharmacy.getCip())) {
             return null;
@@ -236,7 +284,7 @@ public class PharmacyService {
 
             pharmacy.getPictures().add(picture);
             pharmacyRepository.save(pharmacy);
-            
+
             return picture;
         } catch (Exception e) {
             pictureService.deleteImage(newFileName);

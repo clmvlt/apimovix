@@ -9,4 +9,6 @@ public class PharmacySearchDTO {
     private String cip;
     private String address;
     private String name;
+    private Boolean isLocationValid;
+    private Integer max;
 }

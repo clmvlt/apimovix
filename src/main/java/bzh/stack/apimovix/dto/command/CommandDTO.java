@@ -28,6 +28,7 @@ public class CommandDTO {
     private Double latitude;
     private Double longitude;
     private Double tarif;
+    private Boolean isForced;
 
     private List<PackageDTO> packages = new ArrayList<>();
     private PharmacyDTO pharmacy;

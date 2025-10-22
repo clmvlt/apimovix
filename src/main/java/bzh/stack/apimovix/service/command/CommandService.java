@@ -215,26 +215,16 @@ public class CommandService {
                 profil, status);
         command.setLastHistoryStatus(historyCommandStatus);
         
-        // Mettre à jour le statut des packages associés
         Integer packageStatusId = mapCommandStatusToPackageStatus(status.getId());
-        if (packageStatusId != null && command.getPackages() != null) {
+        if (isWeb && packageStatusId != null && command.getPackages() != null) {
             Optional<PackageStatus> packageStatus = packageStatusService.findPackageStatus(packageStatusId);
             if (packageStatus.isPresent()) {
                 for (PackageEntity packageEntity : command.getPackages()) {
-                    // Vérifier si le statut actuel du package est différent du nouveau statut
-                    boolean packageStatusDifferent = packageEntity.getLastHistoryStatus() == null || 
-                                                     packageEntity.getLastHistoryStatus().getStatus() == null ||
-                                                     !packageEntity.getLastHistoryStatus().getStatus().getId().equals(packageStatus.get().getId());
-                    
-                    // Ne mettre à jour que si le statut est différent
-                    if (packageStatusDifferent) {
-                        packageService.updatePackageStatus(profil, packageStatus.get(), packageEntity);
-                    }
+                    packageService.updatePackageStatus(profil, packageStatus.get(), packageEntity);
                 }
             }
         }
         
-        // Créer une anomalie automatique si nécessaire (statuts 4, 7, 8, 9)
         createAnomalieIfNeeded(profil, command, status, isWeb, comment);
         
         return commandRepository.save(command);
@@ -280,7 +270,7 @@ public class CommandService {
 
             commandsToUpdate.add(command);
             
-            if (packageStatus.isPresent() && command.getPackages() != null) {
+            if (commandUpdateStatusDTO.getIsWeb() && packageStatus.isPresent() && command.getPackages() != null) {
                 for (PackageEntity packageEntity : command.getPackages()) {
                     // Vérifier si le statut actuel du package est différent du nouveau statut
                     boolean packageStatusDifferent = packageEntity.getLastHistoryStatus() == null || 
@@ -434,6 +424,9 @@ public class CommandService {
                 }
                 if (commandUpdateDTO.getComment() != null) {
                     command.setComment(commandUpdateDTO.getComment());
+                }
+                if (commandUpdateDTO.getIsForced() != null) {
+                    command.setIsForced(commandUpdateDTO.getIsForced());
                 }
                 commandsToUpdate.add(command);
             }

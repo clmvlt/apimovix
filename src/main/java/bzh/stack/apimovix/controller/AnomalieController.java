@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +21,9 @@ import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.anomalie.AnomalieCreateDTO;
 import bzh.stack.apimovix.dto.anomalie.AnomalieDTO;
 import bzh.stack.apimovix.dto.anomalie.AnomalieDetailDTO;
+import bzh.stack.apimovix.dto.anomalie.AnomalieEmailDTO;
 import bzh.stack.apimovix.dto.anomalie.AnomalieSearchDTO;
+import bzh.stack.apimovix.dto.anomalie.AnomalieUpdateDTO;
 import bzh.stack.apimovix.mapper.AnomalieMapper;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Profil;
@@ -118,6 +121,47 @@ public class AnomalieController {
         }
 
         return MAPIR.created(anomalieMapper.toDetailDto(optAnomalie.get()));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update anomaly comment", description = "Updates the comment of an existing anomaly", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated anomaly", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AnomalieDetailDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Anomaly not found", content = @Content),
+    })
+    public ResponseEntity<?> updateAnomalie(
+            HttpServletRequest request,
+            @Parameter(description = "UUID of the anomaly to update", required = true, schema = @Schema(type = "string", format = "uuid")) @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.PATH_INVALID_FORMAT_UUID) @PathVariable String id,
+            @Parameter(description = "Anomaly update data", required = true, schema = @Schema(implementation = AnomalieUpdateDTO.class)) @Valid @RequestBody AnomalieUpdateDTO updateDTO) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        UUID uuid = UUID.fromString(id);
+
+        Optional<Anomalie> optAnomalie = anomalieService.updateAnomalie(profil.getAccount(), uuid, updateDTO);
+        if (optAnomalie.isEmpty()) {
+            return MAPIR.notFound();
+        }
+
+        return MAPIR.ok(anomalieMapper.toDetailDto(optAnomalie.get()));
+    }
+
+    @PostMapping("/{id}/send-email")
+    @Operation(summary = "Send anomaly by email", description = "Sends the anomaly with PDF attachment to specified email addresses or account default emails", responses = {
+            @ApiResponse(responseCode = "200", description = "Email sent successfully", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Anomaly not found", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Error sending email", content = @Content),
+    })
+    public ResponseEntity<?> sendAnomalieEmail(
+            HttpServletRequest request,
+            @Parameter(description = "UUID of the anomaly to send by email", required = true, schema = @Schema(type = "string", format = "uuid")) @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.PATH_INVALID_FORMAT_UUID) @PathVariable String id,
+            @Parameter(description = "Email configuration with optional custom recipients", required = true, schema = @Schema(implementation = AnomalieEmailDTO.class)) @Valid @RequestBody AnomalieEmailDTO emailDTO) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        UUID uuid = UUID.fromString(id);
+
+        boolean success = anomalieService.sendAnomalieEmail(profil.getAccount(), uuid, emailDTO);
+        if (!success) {
+            return MAPIR.notFound();
+        }
+
+        return MAPIR.ok("Email envoyé avec succès");
     }
 
     @PostMapping(value = "/{id}/pdf", produces = {MediaType.APPLICATION_PDF_VALUE, MediaType.APPLICATION_JSON_VALUE})
