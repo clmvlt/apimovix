@@ -986,8 +986,8 @@ public class PdfGeneratorService {
      */
     public byte[] generatePharmacyLabel(Pharmacy pharmacy) throws IOException {
         // Format étiquette 41x89mm
-        float width = 252.283f;  // 89mm en points
-        float height = 116.220f; // 41mm en points
+        float height = 252.283f;  // 89mm en points
+        float width = 116.220f; // 41mm en points
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
