@@ -166,9 +166,11 @@ public class AnomalieService {
         // Créer une notification pour l'account
         try {
             String notificationTitle = "Nouvelle anomalie créée";
-            String notificationMessage = String.format("Une anomalie de type '%s' a été créée pour la pharmacie %s",
+            String notificationMessage = String.format("Une anomalie de type '%s' a été créée pour la pharmacie %s par %s %s",
                     finalAnomalie.getTypeAnomalie().getName(),
-                    finalAnomalie.getPharmacy().getName());
+                    finalAnomalie.getPharmacy().getName(),
+                    profil.getFirstName(),
+                    profil.getLastName());
             notificationService.sendNotificationWithEntity(
                     profil.getAccount().getId(),
                     NotificationType.ANOMALIE,

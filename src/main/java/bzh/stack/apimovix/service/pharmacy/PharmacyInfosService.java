@@ -78,8 +78,10 @@ public class PharmacyInfosService {
         // Créer une notification pour l'account
         try {
             String notificationTitle = "Nouvelle information pharmacie ajoutée";
-            String notificationMessage = String.format("Une nouvelle information a été ajoutée pour la pharmacie %s",
-                    pharmacy.getName());
+            String notificationMessage = String.format("Une nouvelle information a été ajoutée pour la pharmacie %s par %s %s",
+                    pharmacy.getName(),
+                    profil.getFirstName(),
+                    profil.getLastName());
             notificationService.sendNotificationWithEntity(
                     profil.getAccount().getId(),
                     NotificationType.INFORMATION,
