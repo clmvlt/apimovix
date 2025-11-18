@@ -32,7 +32,13 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
            "    LOWER(p.address3) LIKE LOWER(CONCAT('%', :address, '%'))) " +
            "AND (:isLocationValid IS NULL OR " +
            "    (:isLocationValid = true AND p.latitude IS NOT NULL AND p.latitude != 0 AND p.longitude IS NOT NULL AND p.longitude != 0) OR " +
-           "    (:isLocationValid = false AND (p.latitude IS NULL OR p.latitude = 0 OR p.longitude IS NULL OR p.longitude = 0)))" +
+           "    (:isLocationValid = false AND (p.latitude IS NULL OR p.latitude = 0 OR p.longitude IS NULL OR p.longitude = 0))) " +
+           "AND (:zoneId IS NULL OR " +
+           "    (:zoneId = 'none' AND p.id_zone IS NULL) OR " +
+           "    (:zoneId IS NOT NULL AND :zoneId != 'none' AND CAST(p.id_zone AS VARCHAR) = :zoneId)) " +
+           "AND (:hasOrdered IS NULL OR " +
+           "    (:hasOrdered = true AND (p.never_ordered IS NULL OR p.never_ordered = false)) OR " +
+           "    (:hasOrdered = false AND p.never_ordered = true))" +
            " ORDER BY p.cip LIMIT :maxResults",
            nativeQuery = true)
     List<Pharmacy> searchPharmacies(
@@ -43,6 +49,8 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
         @Param("cip") String cip,
         @Param("address") String address,
         @Param("isLocationValid") Boolean isLocationValid,
-        @Param("maxResults") Integer maxResults
+        @Param("maxResults") Integer maxResults,
+        @Param("zoneId") String zoneId,
+        @Param("hasOrdered") Boolean hasOrdered
     );
 } 

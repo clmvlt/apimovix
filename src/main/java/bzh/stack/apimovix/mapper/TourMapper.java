@@ -21,29 +21,32 @@ import bzh.stack.apimovix.model.History.HistoryTourStatus;
     componentModel = "spring",
     unmappedTargetPolicy = ReportingPolicy.IGNORE,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {CommandMapper.class, ProfileMapper.class}
+    uses = {CommandMapper.class, ProfileMapper.class, ZoneMapper.class}
 )
 @Component
 public interface TourMapper {
-    
+
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "status.profil", source = "lastHistoryStatus.profil", qualifiedByName = "toDto")
     @Mapping(target = "profil", source = "profil", qualifiedByName = "toDto")
+    @Mapping(target = "zone", source = "zone", qualifiedByName = "toDto")
     @Mapping(target = "commands", source = "commands", qualifiedByName = "toDTO")
     TourDTO toDto(Tour tour);
-    
+
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "status.profil", source = "lastHistoryStatus.profil", qualifiedByName = "toDto")
     @Mapping(target = "profil", source = "profil", qualifiedByName = "toDto")
+    @Mapping(target = "zone", source = "zone", qualifiedByName = "toDto")
     @Mapping(target = "commands", ignore = true)
     TourDTO toDtoLight(Tour tour);
-    
+
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "status.profil", source = "lastHistoryStatus.profil", qualifiedByName = "toDto")
     @Mapping(target = "profil", source = "profil", qualifiedByName = "toDto")
+    @Mapping(target = "zone", source = "zone", qualifiedByName = "toDto")
     TourDetailDTO toDetailDto(Tour tour);
     
     @Mapping(target = "id", source = "status.id")
@@ -58,29 +61,34 @@ public interface TourMapper {
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "profil", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zone", ignore = true)
     Tour toEntity(TourDTO dto);
-    
+
     @Mapping(target = "commands", ignore = true)
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "profil", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zone", ignore = true)
     Tour toCreateEntity(TourCreateDTO dto);
-    
+
     @Mapping(target = "commands", ignore = true)
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "profil", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zone", ignore = true)
     Tour toEntity(TourUpdateDTO dto);
-    
+
     @Mapping(target = "commands", ignore = true)
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "profil", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zone", ignore = true)
     void updateEntityFromDto(TourDTO dto, @MappingTarget Tour tour);
-    
+
     @Mapping(target = "commands", ignore = true)
     @Mapping(target = "account", ignore = true)
     @Mapping(target = "profil", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zone", ignore = true)
     void updateEntityFromUpdateDto(TourUpdateDTO dto, @MappingTarget Tour tour);
 } 

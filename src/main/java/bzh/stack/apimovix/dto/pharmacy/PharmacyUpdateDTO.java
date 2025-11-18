@@ -1,10 +1,7 @@
 package bzh.stack.apimovix.dto.pharmacy;
 
-import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-import bzh.stack.apimovix.util.GLOBAL;
-import bzh.stack.apimovix.util.PATTERNS;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -29,10 +26,20 @@ public class PharmacyUpdateDTO {
     private String quality;
     private String first_name;
     private String last_name;
-    
+
     @Size(max = 4000, message = "Le commentaire ne peut pas dépasser 4000 caractères")
     private String commentaire;
 
-    @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.INVALID_FORMAT_UUID)
-    private UUID zoneId;
+    // Permet d'accepter null explicitement pour supprimer la zone
+    @JsonProperty("zoneId")
+    private String zoneId;
+
+    // Flag pour savoir si zoneId était présent dans la requête JSON
+    private transient boolean zoneIdWasSet = false;
+
+    @JsonProperty("zoneId")
+    public void setZoneId(String zoneId) {
+        this.zoneId = zoneId;
+        this.zoneIdWasSet = true;
+    }
 } 

@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import bzh.stack.apimovix.dto.profil.ProfilCreateDTO;
 import bzh.stack.apimovix.dto.profil.ProfilUpdateDTO;
 import bzh.stack.apimovix.exception.FieldAlreadyUsed;
+import bzh.stack.apimovix.exception.ProfileLimitExceededException;
+import bzh.stack.apimovix.exception.UnauthorizedAdminModificationException;
 import bzh.stack.apimovix.mapper.ProfileMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.PasswordResetToken;
@@ -42,7 +44,20 @@ public class ProfileService {
     }
 
     @Transactional
-    public Profil createProfile(Account account, ProfilCreateDTO createDTO) {
+    public Profil createProfile(Account account, ProfilCreateDTO createDTO, Profil currentProfil) {
+        // Vérifier la limite de profils (compte tous les profils actifs et inactifs)
+        long currentProfileCount = profileRepository.countByAccount(account);
+        Integer maxProfiles = account.getMaxProfiles();
+
+        if (maxProfiles != null && maxProfiles > 0 && currentProfileCount >= maxProfiles) {
+            throw new ProfileLimitExceededException((int) currentProfileCount, maxProfiles);
+        }
+
+        // Vérifier les permissions pour définir isAdmin
+        if (Boolean.TRUE.equals(createDTO.getIsAdmin()) && !Boolean.TRUE.equals(currentProfil.getIsAdmin())) {
+            throw new UnauthorizedAdminModificationException();
+        }
+
         if (Boolean.TRUE.equals(createDTO.getIsWeb()) && profileRepository.existsByEmail(createDTO.getEmail())) {
             throw new FieldAlreadyUsed("email");
         }
@@ -57,28 +72,41 @@ public class ProfileService {
         profil.setId(UUID.randomUUID());
         profil.setToken(generateSecureToken());
 
+        // Si isActive n'est pas spécifié, mettre à true par défaut
+        if (profil.getIsActive() == null) {
+            profil.setIsActive(true);
+        }
+
         return profileRepository.save(profil);
     }
 
     @Transactional
-    public Optional<Profil> updateProfil(Account account, ProfilCreateDTO createDTO, UUID profilId) {
-        // Valider l'email seulement si isWeb est true et que l'email est fourni
-        if (Boolean.TRUE.equals(createDTO.getIsWeb()) && createDTO.getEmail() != null && 
-            profileRepository.existsByEmailAndIdNot(createDTO.getEmail(), profilId)) {
-            throw new FieldAlreadyUsed("email");
-        }
-        
-        // Valider l'identifiant seulement s'il est fourni
-        if (createDTO.getIdentifiant() != null && !createDTO.getIdentifiant().trim().isEmpty() && 
-            profileRepository.existsByIdentifiantAndIdNot(createDTO.getIdentifiant(), profilId)) {
-            throw new FieldAlreadyUsed("identifiant");
-        }
-
+    public Optional<Profil> updateProfil(Account account, ProfilCreateDTO createDTO, UUID profilId, Profil currentProfil) {
         Optional<Profil> optProfil = findProfile(account, profilId);
         if (optProfil.isEmpty()) {
             return Optional.empty();
         }
         Profil profil = optProfil.get();
+
+        // Vérifier les permissions pour modifier isAdmin
+        if (createDTO.getIsAdmin() != null && !createDTO.getIsAdmin().equals(profil.getIsAdmin())) {
+            if (!Boolean.TRUE.equals(currentProfil.getIsAdmin())) {
+                throw new UnauthorizedAdminModificationException();
+            }
+        }
+
+        // Valider l'email seulement si isWeb est true et que l'email est fourni
+        if (Boolean.TRUE.equals(createDTO.getIsWeb()) && createDTO.getEmail() != null &&
+            profileRepository.existsByEmailAndIdNot(createDTO.getEmail(), profilId)) {
+            throw new FieldAlreadyUsed("email");
+        }
+
+        // Valider l'identifiant seulement s'il est fourni
+        if (createDTO.getIdentifiant() != null && !createDTO.getIdentifiant().trim().isEmpty() &&
+            profileRepository.existsByIdentifiantAndIdNot(createDTO.getIdentifiant(), profilId)) {
+            throw new FieldAlreadyUsed("identifiant");
+        }
+
         profileMapper.updateEntityFromCreateDto(createDTO, profil);
         
         // Ne mettre à jour le mot de passe que s'il est fourni
@@ -90,21 +118,28 @@ public class ProfileService {
     }
 
     @Transactional
-    public Optional<Profil> updateProfilWithoutPassword(Account account, ProfilUpdateDTO updateDTO, UUID profilId) {
-        // Valider l'email seulement si isWeb est true et que l'email est fourni
-        if (Boolean.TRUE.equals(updateDTO.getIsWeb()) && updateDTO.getEmail() != null && 
-            profileRepository.existsByEmailAndIdNot(updateDTO.getEmail(), profilId)) {
-            throw new FieldAlreadyUsed("email");
-        }
-        
+    public Optional<Profil> updateProfilWithoutPassword(Account account, ProfilUpdateDTO updateDTO, UUID profilId, Profil currentProfil) {
         Optional<Profil> optProfil = findProfile(account, profilId);
         if (optProfil.isEmpty()) {
             return Optional.empty();
         }
         Profil profil = optProfil.get();
-        
+
+        // Vérifier les permissions pour modifier isAdmin
+        if (updateDTO.getIsAdmin() != null && !updateDTO.getIsAdmin().equals(profil.getIsAdmin())) {
+            if (!Boolean.TRUE.equals(currentProfil.getIsAdmin())) {
+                throw new UnauthorizedAdminModificationException();
+            }
+        }
+
+        // Valider l'email seulement si isWeb est true et que l'email est fourni
+        if (Boolean.TRUE.equals(updateDTO.getIsWeb()) && updateDTO.getEmail() != null &&
+            profileRepository.existsByEmailAndIdNot(updateDTO.getEmail(), profilId)) {
+            throw new FieldAlreadyUsed("email");
+        }
+
         // Valider l'identifiant seulement s'il est fourni et différent de l'actuel
-        if (updateDTO.getIdentifiant() != null && !updateDTO.getIdentifiant().trim().isEmpty() && 
+        if (updateDTO.getIdentifiant() != null && !updateDTO.getIdentifiant().trim().isEmpty() &&
             !updateDTO.getIdentifiant().equals(profil.getIdentifiant()) &&
             profileRepository.existsByIdentifiantAndIdNot(updateDTO.getIdentifiant(), profilId)) {
             throw new FieldAlreadyUsed("identifiant");

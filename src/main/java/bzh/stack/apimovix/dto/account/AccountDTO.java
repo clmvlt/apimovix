@@ -28,4 +28,5 @@ public class AccountDTO {
     private String anomaliesEmails;
     private Boolean isScanCIP;
     private Boolean autoSendAnomalieEmails;
+    private Boolean autoCreateTour;
 }

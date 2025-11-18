@@ -88,7 +88,12 @@ public class AccountService {
         if (updateDTO.getIsScanCIP() != null) {
             account.setIsScanCIP(updateDTO.getIsScanCIP());
         }
-
+        if (updateDTO.getAutoSendAnomalieEmails() != null) {
+            account.setAutoSendAnomalieEmails(updateDTO.getAutoSendAnomalieEmails());
+        }
+        if (updateDTO.getAutoCreateTour() != null) {
+            account.setAutoCreateTour(updateDTO.getAutoCreateTour());
+        }
 
         return accountRepository.save(account);
     }
@@ -116,6 +121,7 @@ public class AccountService {
         account.setSmtpUseSsl(createDTO.getSmtpUseSsl() != null ? createDTO.getSmtpUseSsl() : false);
         account.setIsScanCIP(createDTO.getIsScanCIP() != null ? createDTO.getIsScanCIP() : false);
         account.setAutoSendAnomalieEmails(createDTO.getAutoSendAnomalieEmails() != null ? createDTO.getAutoSendAnomalieEmails() : false);
+        account.setAutoCreateTour(createDTO.getAutoCreateTour() != null ? createDTO.getAutoCreateTour() : false);
 
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());

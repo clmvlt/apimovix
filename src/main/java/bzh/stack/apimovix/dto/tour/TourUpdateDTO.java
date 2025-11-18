@@ -28,7 +28,8 @@ public class TourUpdateDTO {
     private Double estimateMins;
     private Double estimateKm;
     private String geometry;
-    
+    private java.util.UUID zoneId;
+
     // Helper method to check if immat should be cleared
     public boolean shouldClearImmat() {
         return immat != null && (immat.trim().isEmpty() || "null".equalsIgnoreCase(immat.trim()));

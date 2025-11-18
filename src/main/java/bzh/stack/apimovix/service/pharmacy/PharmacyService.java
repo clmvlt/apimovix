@@ -147,7 +147,9 @@ public class PharmacyService {
                 pharmacySearchDTO.getCip(),
                 address,
                 pharmacySearchDTO.getIsLocationValid(),
-                maxResults);
+                maxResults,
+                pharmacySearchDTO.getZoneId(),
+                pharmacySearchDTO.getHasOrdered());
     }
 
     @Transactional
@@ -223,12 +225,29 @@ public class PharmacyService {
         }
         Pharmacy pharmacy = optPharmacy.get();
         pharmacyMapper.updateEntityFromDto(pharmacyUpdateDTO, pharmacy);
-        if (pharmacyUpdateDTO.getZoneId() != null) {
-            Optional<Zone> zoneOptional = zoneRepository.findZone(account, pharmacyUpdateDTO.getZoneId());
-            if (zoneOptional.isPresent()) {
-                pharmacy.setZone(zoneOptional.get());
+
+        // Gérer la zone uniquement si le champ zoneId était présent dans la requête
+        if (pharmacyUpdateDTO.isZoneIdWasSet()) {
+            String zoneIdStr = pharmacyUpdateDTO.getZoneId();
+
+            if (zoneIdStr == null || zoneIdStr.trim().isEmpty()) {
+                // Si zoneId est null ou vide, supprimer la zone
+                pharmacy.setZone(null);
+            } else {
+                // Sinon, assigner une nouvelle zone
+                try {
+                    UUID zoneId = UUID.fromString(zoneIdStr);
+                    Optional<Zone> zoneOptional = zoneRepository.findZone(account, zoneId);
+                    if (zoneOptional.isPresent()) {
+                        pharmacy.setZone(zoneOptional.get());
+                    }
+                } catch (IllegalArgumentException e) {
+                    // UUID invalide, on ignore
+                }
             }
         }
+        // Si zoneId n'était pas dans la requête, on ne touche pas à la zone
+
         return Optional.of(pharmacyRepository.save(pharmacy));
     }
 

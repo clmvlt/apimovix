@@ -81,6 +81,9 @@ public class Profil {
     @Column(name = "deleted")
     private Boolean deleted = false;
 
+    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isActive = true;
+
     public String getFullName() {
         StringBuilder fullName = new StringBuilder();
         if (firstName != null) {

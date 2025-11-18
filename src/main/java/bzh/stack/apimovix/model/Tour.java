@@ -81,6 +81,10 @@ public class Tour {
     @JoinColumn(name = "id_status")
     private HistoryTourStatus lastHistoryStatus;
 
+    @ManyToOne
+    @JoinColumn(name = "id_zone")
+    private Zone zone;
+
     @OneToMany(mappedBy = "tour", fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<Command> commands = new ArrayList<>();

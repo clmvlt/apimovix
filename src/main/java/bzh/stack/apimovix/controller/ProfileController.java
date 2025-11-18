@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import bzh.stack.apimovix.annotation.AdminRequired;
 import bzh.stack.apimovix.annotation.TokenNotRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.profil.ForgotPasswordDTO;
@@ -45,7 +44,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping(path = "/profiles", produces = MediaType.APPLICATION_JSON_VALUE)
-@AdminRequired
+@TokenRequired
 @RequiredArgsConstructor
 @Tag(name = "User Profiles", description = "API for managing user profiles and their permissions")
 @ApiResponse(responseCode = "400", description = GLOBAL.ERROR_400, content = @Content)
@@ -79,7 +78,7 @@ public class ProfileController {
             HttpServletRequest request,
             @Parameter(description = "Profile creation data", required = true, schema = @Schema(implementation = ProfilCreateDTO.class)) @Valid @RequestBody ProfilCreateDTO profilCreateDTO) {
         Profil profil = (Profil) request.getAttribute("profil");
-        Profil createdProfil = profileService.createProfile(profil.getAccount(), profilCreateDTO);
+        Profil createdProfil = profileService.createProfile(profil.getAccount(), profilCreateDTO, profil);
         return MAPIR.created(profileMapper.toDto(createdProfil));
     }
 
@@ -95,7 +94,7 @@ public class ProfileController {
             @Parameter(description = "UUID of the profile to update", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String id) {
         Profil profil = (Profil) request.getAttribute("profil");
         UUID uuid = UUID.fromString(id);
-        Optional<Profil> optProfil = profileService.updateProfilWithoutPassword(profil.getAccount(), profilUpdateDTO, uuid);
+        Optional<Profil> optProfil = profileService.updateProfilWithoutPassword(profil.getAccount(), profilUpdateDTO, uuid, profil);
         if (optProfil.isEmpty()) {
             return MAPIR.notFound();
         }

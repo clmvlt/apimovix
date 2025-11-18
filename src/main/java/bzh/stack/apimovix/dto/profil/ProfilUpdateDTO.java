@@ -19,9 +19,10 @@ public class ProfilUpdateDTO {
     
     @Email(message = GLOBAL.INVALID_FORMAT_EMAIL)
     private String email;
-    
+
     private Boolean isStock;
     private Boolean isAvtrans;
+    private Boolean isActive;
 
     @AssertTrue(message = GLOBAL.REQUIRED)
     private boolean isEmail() {

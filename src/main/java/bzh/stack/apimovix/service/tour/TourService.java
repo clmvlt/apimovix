@@ -32,9 +32,11 @@ import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Tarif;
 import bzh.stack.apimovix.model.Tour;
+import bzh.stack.apimovix.model.Zone;
 import bzh.stack.apimovix.model.History.HistoryTourStatus;
 import bzh.stack.apimovix.model.StatusType.CommandStatus;
 import bzh.stack.apimovix.model.StatusType.TourStatus;
+import bzh.stack.apimovix.repository.ZoneRepository;
 import bzh.stack.apimovix.repository.tour.HistoryTourStatusRepository;
 import bzh.stack.apimovix.repository.tour.TourRepository;
 import bzh.stack.apimovix.service.ORSService;
@@ -56,6 +58,7 @@ public class TourService {
     private final HistoryTourStatusRepository historyTourStatusRepository;
     private final ORSService orsService;
     private final TarifService tarifService;
+    private final ZoneRepository zoneRepository;
 
     public TourService(
             TourMapper tourMapper,
@@ -67,7 +70,8 @@ public class TourService {
             CommandStatusService commandStatusService,
             HistoryTourStatusRepository historyTourStatusRepository,
             ORSService orsService,
-            TarifService tarifService) {
+            TarifService tarifService,
+            ZoneRepository zoneRepository) {
         this.tourMapper = tourMapper;
         this.tourRepository = tourRepository;
         this.historyTourStatusService = historyTourStatusService;
@@ -78,6 +82,7 @@ public class TourService {
         this.historyTourStatusRepository = historyTourStatusRepository;
         this.orsService = orsService;
         this.tarifService = tarifService;
+        this.zoneRepository = zoneRepository;
     }
 
     @Transactional(readOnly = true)
@@ -196,6 +201,10 @@ public class TourService {
         }
         if (tourUpdate.getGeometry() != null) {
             tour.setGeometry(tourUpdate.getGeometry());
+        }
+        if (tourUpdate.getZoneId() != null) {
+            Optional<Zone> optZone = zoneRepository.findZone(account, tourUpdate.getZoneId());
+            tour.setZone(optZone.orElse(null));
         }
 
         return Optional.of(tourRepository.save(tour));
@@ -389,6 +398,13 @@ public class TourService {
         Tour tour = tourMapper.toCreateEntity(tourCreateDTO);
         tour.setId(generateNewId());
         tour.setAccount(profil.getAccount());
+
+        // Gérer la zone si fournie
+        if (tourCreateDTO.getZoneId() != null) {
+            Optional<Zone> optZone = zoneRepository.findZone(profil.getAccount(), tourCreateDTO.getZoneId());
+            tour.setZone(optZone.orElse(null));
+        }
+
         tourRepository.save(tour);
 
         Optional<TourStatus> optStatus = tourStatusService.findTourStatusById(2);
@@ -529,13 +545,66 @@ public class TourService {
         if (command.getTarif() != null) {
             return command.getTarif();
         }
-        
+
         // Calculer le tarif estimé basé sur la distance
         Double distance = orsService.calculateCommandDistance(command).orElse(0.0);
         Optional<Tarif> matchingTarif = tarifs.stream()
                 .filter(tarif -> distance <= tarif.getKmMax())
                 .min((t1, t2) -> Double.compare(t1.getKmMax(), t2.getKmMax()));
-        
+
         return matchingTarif.map(Tarif::getPrixEuro).orElse(0.0);
+    }
+
+    /**
+     * Duplique les tours d'une date donnée vers une nouvelle date pour un compte
+     * @param account Le compte pour lequel dupliquer les tours
+     * @param sourceDate La date source dont les tours doivent être dupliqués
+     * @param targetDate La date cible pour les nouveaux tours
+     * @param profil Le profil qui crée les tours (pour l'historique)
+     * @return Le nombre de tours dupliqués
+     */
+    @Transactional
+    public int duplicateToursFromDate(Account account, LocalDate sourceDate, LocalDate targetDate, Profil profil) {
+        // Vérifier si des tours existent déjà pour la date cible
+        List<Tour> existingTargetTours = findTours(account, targetDate);
+        if (!existingTargetTours.isEmpty()) {
+            // Des tours existent déjà pour cette date, ne pas créer de doublons
+            return 0;
+        }
+
+        // Récupérer les tours de la date source
+        List<Tour> sourceTours = findTours(account, sourceDate);
+
+        if (sourceTours.isEmpty()) {
+            return 0;
+        }
+
+        int duplicatedCount = 0;
+
+        for (Tour sourceTour : sourceTours) {
+            // Créer un nouveau DTO avec les mêmes paramètres
+            TourCreateDTO tourCreateDTO = new TourCreateDTO();
+            tourCreateDTO.setName(sourceTour.getName());
+            tourCreateDTO.setColor(sourceTour.getColor());
+            tourCreateDTO.setInitialDate(targetDate);
+
+            // Copier la zone si elle existe
+            if (sourceTour.getZone() != null) {
+                tourCreateDTO.setZoneId(sourceTour.getZone().getId());
+            }
+
+            // Créer le nouveau tour
+            Tour newTour = createTour(profil, tourCreateDTO);
+
+            // Si le tour source avait un profil assigné, l'assigner au nouveau tour
+            if (sourceTour.getProfil() != null) {
+                newTour.setProfil(sourceTour.getProfil());
+                tourRepository.save(newTour);
+            }
+
+            duplicatedCount++;
+        }
+
+        return duplicatedCount;
     }
 }

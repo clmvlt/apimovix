@@ -30,13 +30,20 @@ public class AuthService {
         
         if (profilOpt.isPresent()) {
             Profil profil = profilOpt.get();
+
+            // Vérifier que le profil est actif
+            if (Boolean.FALSE.equals(profil.getIsActive())) {
+                log.warn("Tentative de connexion avec un profil inactif: {}", identifiant);
+                return Optional.empty();
+            }
+
             String hashedPassword = hashPassword(creds.getPassword());
-            
+
             if (profil.getPasswordHash().equals(hashedPassword)) {
                 return Optional.of(profil);
             }
         }
-        
+
         return Optional.empty();
     }
 

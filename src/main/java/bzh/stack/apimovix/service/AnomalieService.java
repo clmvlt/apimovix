@@ -31,13 +31,16 @@ import bzh.stack.apimovix.model.StatusType.TypeAnomalie;
 import bzh.stack.apimovix.repository.anomalie.AnomaliePictureRepository;
 import bzh.stack.apimovix.repository.anomalie.AnomalieRepository;
 import bzh.stack.apimovix.repository.anomalie.TypeAnomalieRepository;
+import bzh.stack.apimovix.model.Notification.NotificationType;
 import bzh.stack.apimovix.service.packageservices.PackageService;
 import bzh.stack.apimovix.service.pharmacy.PharmacyService;
 import bzh.stack.apimovix.service.picture.PictureService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AnomalieService {
 
     private final AnomaliePictureRepository anomaliePictureRepository;
@@ -48,6 +51,7 @@ public class AnomalieService {
     private final PackageService packageService;
     private final PictureService pictureService;
     private final EmailService emailService;
+    private final NotificationService notificationService;
     private final PdfGeneratorService pdfGeneratorService;
 
     @Transactional(readOnly = true)
@@ -156,8 +160,26 @@ public class AnomalieService {
         anomaliePictureRepository.saveAll(pictures);
         
         savedAnomalie.setPictures(pictures);
-        
+
         final Anomalie finalAnomalie = anomalieRepository.save(savedAnomalie);
+
+        // Créer une notification pour l'account
+        try {
+            String notificationTitle = "Nouvelle anomalie créée";
+            String notificationMessage = String.format("Une anomalie de type '%s' a été créée pour la pharmacie %s",
+                    finalAnomalie.getTypeAnomalie().getName(),
+                    finalAnomalie.getPharmacy().getName());
+            notificationService.sendNotificationWithEntity(
+                    profil.getAccount().getId(),
+                    NotificationType.ANOMALIE,
+                    notificationTitle,
+                    notificationMessage,
+                    "ANOMALIE",
+                    finalAnomalie.getId()
+            );
+        } catch (Exception e) {
+            log.error("Error creating notification for anomalie: {}", e.getMessage(), e);
+        }
 
         // Envoyer l'email de notification de manière asynchrone seulement si l'envoi automatique est activé
         if (profil.getAccount().getAutoSendAnomalieEmails() != null && profil.getAccount().getAutoSendAnomalieEmails()) {

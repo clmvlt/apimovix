@@ -38,4 +38,7 @@ public interface ProfileRepository extends JpaRepository<Profil, UUID> {
     
     @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Profil p WHERE p.identifiant = :identifiant AND p.id != :id AND (p.deleted IS NULL OR p.deleted = false)")
     public boolean existsByIdentifiantAndIdNot(@Param("identifiant") String identifiant, @Param("id") UUID id);
+
+    @Query("SELECT COUNT(p) FROM Profil p WHERE p.account = :account AND (p.deleted IS NULL OR p.deleted = false)")
+    public long countByAccount(@Param("account") Account account);
 } 

@@ -1,6 +1,7 @@
 package bzh.stack.apimovix.dto.tour;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
@@ -21,4 +22,6 @@ public class TourCreateDTO {
     @NotNull(message = GLOBAL.REQUIRED)
     @JsonFormat(pattern = PATTERNS.DATE)
     private LocalDate initialDate;
+
+    private UUID zoneId;
 }

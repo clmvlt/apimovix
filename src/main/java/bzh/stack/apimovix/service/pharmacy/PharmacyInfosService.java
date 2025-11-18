@@ -15,19 +15,24 @@ import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInfos;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Picture.PharmacyInfosPicture;
+import bzh.stack.apimovix.model.Notification.NotificationType;
 import bzh.stack.apimovix.repository.pharmacy.PharmacyInfosPictureRepository;
 import bzh.stack.apimovix.repository.pharmacy.PharmacyInfosRepository;
+import bzh.stack.apimovix.service.NotificationService;
 import bzh.stack.apimovix.service.picture.PictureService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PharmacyInfosService {
 
     private final PharmacyInfosRepository pharmacyInfosRepository;
     private final PharmacyInfosPictureRepository pharmacyInfosPictureRepository;
     private final PharmacyInfosMapper pharmacyInfosMapper;
     private final PharmacyService pharmacyService;
+    private final NotificationService notificationService;
     private final PictureService pictureService;
 
     @Transactional(readOnly = true)
@@ -69,7 +74,24 @@ public class PharmacyInfosService {
 
         savedPharmacyInfos.getPictures().clear();
         savedPharmacyInfos.getPictures().addAll(pharmacyInfosPictures);
-        
+
+        // Créer une notification pour l'account
+        try {
+            String notificationTitle = "Nouvelle information pharmacie ajoutée";
+            String notificationMessage = String.format("Une nouvelle information a été ajoutée pour la pharmacie %s",
+                    pharmacy.getName());
+            notificationService.sendNotificationWithEntity(
+                    profil.getAccount().getId(),
+                    NotificationType.INFORMATION,
+                    notificationTitle,
+                    notificationMessage,
+                    "PHARMACY_INFO",
+                    savedPharmacyInfos.getId()
+            );
+        } catch (Exception e) {
+            log.error("Error creating notification for pharmacy info: {}", e.getMessage(), e);
+        }
+
         return Optional.of(savedPharmacyInfos);
     }
 

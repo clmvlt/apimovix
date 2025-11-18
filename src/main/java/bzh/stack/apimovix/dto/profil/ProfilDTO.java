@@ -21,4 +21,5 @@ public class ProfilDTO {
     private String email;
     private Boolean isStock;
     private Boolean isAvtrans;
+    private Boolean isActive;
 }

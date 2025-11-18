@@ -11,4 +11,6 @@ public class PharmacySearchDTO {
     private String name;
     private Boolean isLocationValid;
     private Integer max;
+    private String zoneId;
+    private Boolean hasOrdered;
 }

@@ -33,4 +33,6 @@ public class AccountUpdateDTO {
 
     private Boolean autoSendAnomalieEmails;
 
+    private Boolean autoCreateTour;
+
 } 

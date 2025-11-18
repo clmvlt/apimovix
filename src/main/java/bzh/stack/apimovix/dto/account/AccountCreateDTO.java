@@ -32,4 +32,6 @@ public class AccountCreateDTO {
     private Boolean isScanCIP;
 
     private Boolean autoSendAnomalieEmails;
+
+    private Boolean autoCreateTour;
 }
