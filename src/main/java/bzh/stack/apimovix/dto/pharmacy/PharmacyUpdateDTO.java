@@ -42,4 +42,17 @@ public class PharmacyUpdateDTO {
         this.zoneId = zoneId;
         this.zoneIdWasSet = true;
     }
+
+    // Permet d'accepter null explicitement pour supprimer le account
+    @JsonProperty("accountId")
+    private String accountId;
+
+    // Flag pour savoir si accountId était présent dans la requête JSON
+    private transient boolean accountIdWasSet = false;
+
+    @JsonProperty("accountId")
+    public void setAccountId(String accountId) {
+        this.accountId = accountId;
+        this.accountIdWasSet = true;
+    }
 } 

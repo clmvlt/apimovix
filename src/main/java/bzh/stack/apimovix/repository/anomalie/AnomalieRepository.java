@@ -42,6 +42,9 @@ public interface AnomalieRepository extends JpaRepository<Anomalie, UUID> {
            "WHERE a.account = :account AND a.id = :id")
     Anomalie findAnomalie(@Param("account") Account account, @Param("id") UUID id);
     
+    @Query("SELECT a FROM Anomalie a WHERE a.pharmacy.cip = :cip")
+    List<Anomalie> findAllAnomaliesByPharmacyCip(@Param("cip") String cip);
+
     @Query("SELECT DISTINCT a FROM Anomalie a " +
            "LEFT JOIN FETCH a.pharmacy p " +
            "LEFT JOIN FETCH a.profil pr " +

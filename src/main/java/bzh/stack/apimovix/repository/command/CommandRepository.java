@@ -18,8 +18,8 @@ import bzh.stack.apimovix.model.History.HistoryCommandStatus;
 @Repository
 public interface CommandRepository extends JpaRepository<Command, UUID> {
 
-    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND (c.lastHistoryStatus IS NULL OR c.lastHistoryStatus.status.id = 1) AND DATE(c.expDate) = DATE(:date) ORDER BY c.expDate DESC LIMIT 1")
-    public Command findPharmacyCommandByDate(@Param("cip") String cip, @Param("date") LocalDateTime date);
+    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account AND (c.lastHistoryStatus IS NULL OR c.lastHistoryStatus.status.id = 1) AND DATE(c.expDate) = DATE(:date) ORDER BY c.expDate DESC LIMIT 1")
+    public Command findPharmacyCommandByDate(@Param("account") Account account, @Param("cip") String cip, @Param("date") LocalDateTime date);
 
 
     @Query("SELECT DISTINCT c FROM Command c LEFT JOIN FETCH c.tour t WHERE c.id IN :ids AND c.sender.account = :account")
@@ -42,7 +42,7 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "c.lastHistoryStatus.status) " +
            "FROM Command c " +
            "LEFT JOIN c.tour t " +
-           "WHERE (t.account = :account OR t IS NULL) " +
+           "WHERE c.sender.account = :account " +
            "AND c.expDate >= :startDate AND c.expDate < :endDate " +
            "ORDER BY COALESCE(c.tour.id, ''), c.expDate DESC")
     public List<CommandExpeditionDTO> findExpeditionCommands(@Param("account") Account account, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
@@ -50,8 +50,11 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
     @Query("SELECT c FROM Command c WHERE c.id = :id AND c.sender.account = :account")
     public Command findCommandById(Account account, UUID id);
 
-    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip ORDER BY c.expDate DESC LIMIT 5")
-    public List<Command> findLast5CommandsByPharmacyCip(@Param("cip") String cip);
+    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account ORDER BY c.expDate DESC LIMIT 5")
+    public List<Command> findLast5CommandsByPharmacyCip(@Param("account") Account account, @Param("cip") String cip);
+
+    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip")
+    public List<Command> findAllCommandsByPharmacyCip(@Param("cip") String cip);
 
     @Query("SELECT COALESCE(MAX(c.tourOrder), 0) FROM Command c WHERE c.tour.id = :tourId")
     public Integer findMaxTourOrderByTourId(@Param("tourId") String tourId);

@@ -1,5 +1,7 @@
 package bzh.stack.apimovix.dto.pharmacy;
 
+import java.util.UUID;
+
 import bzh.stack.apimovix.dto.zone.ZoneDTO;
 import bzh.stack.apimovix.model.Pharmacy;
 import lombok.Data;
@@ -28,6 +30,7 @@ public class PharmacyDTO {
     private Boolean neverOrdered;
     private String commentaire;
     private ZoneDTO zone;
+    private UUID accountId;
 
     public PharmacyDTO(Pharmacy pharmacy) {
         this.cip = pharmacy.getCip();
@@ -49,6 +52,7 @@ public class PharmacyDTO {
         this.lastName = pharmacy.getLastName();
         this.neverOrdered = pharmacy.getNeverOrdered();
         this.commentaire = pharmacy.getCommentaire();
+        this.accountId = pharmacy.getAccount() != null ? pharmacy.getAccount().getId() : null;
     }
 
     public PharmacyDTO(String cip, String name, String address, String city, String postalCode, Double latitude, Double longitude) {

@@ -33,4 +33,9 @@ public class HistoryCommandStatusService {
         historyCommandStatus.setCreatedAt(createdAt);
         return historyCommandStatusRepository.save(historyCommandStatus);
     }
+
+    @Transactional
+    public void deleteByCommand(Command command) {
+        historyCommandStatusRepository.deleteByCommand(command);
+    }
 } 

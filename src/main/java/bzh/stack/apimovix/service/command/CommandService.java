@@ -58,8 +58,8 @@ public class CommandService {
     private final AnomalieService anomalieService;
 
     @Transactional(readOnly = true)
-    public Optional<Command> findPharmacyCommandByDate(String cip, LocalDateTime date) {
-        Command command = commandRepository.findPharmacyCommandByDate(cip, date);
+    public Optional<Command> findPharmacyCommandByDate(Account account, String cip, LocalDateTime date) {
+        Command command = commandRepository.findPharmacyCommandByDate(account, cip, date);
         return Optional.ofNullable(command);
     }
 
@@ -76,7 +76,7 @@ public class CommandService {
     @Transactional
     public Optional<Command> createCommand(String cip, Sender sender, Profil profil,
             @Valid CommandImporterDTO commandDTO, LocalDateTime expDate, @NotNull Boolean newPharmacy) {
-        Optional<Pharmacy> pharmacyOptional = pharmacyService.findPharmacy(cip);
+        Optional<Pharmacy> pharmacyOptional = pharmacyService.findPharmacyByAccount(sender.getAccount(), cip);
         if (pharmacyOptional.isEmpty())
             return Optional.empty();
         Command command = createCommand(pharmacyOptional.get(), sender, profil, commandDTO, expDate, newPharmacy);
@@ -310,6 +310,11 @@ public class CommandService {
         return Optional.ofNullable(commandRepository.findCommandById(account, id));
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Command> findByIdHyperAdmin(UUID id) {
+        return commandRepository.findById(id);
+    }
+
     public List<HistoryCommandStatus> findCommandHistory(Account account, UUID id) {
         return commandRepository.findCommandHistory(account, id);
     }
@@ -437,8 +442,8 @@ public class CommandService {
     }
 
     @Transactional(readOnly = true)
-    public List<Command> findLast5CommandsByPharmacyCip(String cip) {
-        return commandRepository.findLast5CommandsByPharmacyCip(cip);
+    public List<Command> findLast5CommandsByPharmacyCip(Account account, String cip) {
+        return commandRepository.findLast5CommandsByPharmacyCip(account, cip);
     }
 
     @Transactional
@@ -456,6 +461,49 @@ public class CommandService {
         }
 
         commandRepository.saveAll(commandsToUpdate);
+        return true;
+    }
+
+    @Transactional
+    public boolean deleteCommand(Account account, UUID commandId) {
+        Command command = commandRepository.findCommandById(account, commandId);
+        if (command == null) {
+            return false;
+        }
+
+        // Supprimer tous les packages associés à cette commande
+        if (command.getPackages() != null && !command.getPackages().isEmpty()) {
+            for (PackageEntity packageEntity : command.getPackages()) {
+                packageService.deletePackage(packageEntity.getBarcode());
+            }
+        }
+
+        // Supprimer la commande elle-même
+        commandRepository.delete(command);
+        return true;
+    }
+
+    @Transactional
+    public boolean deleteCommandHyperAdmin(UUID commandId) {
+        Optional<Command> optCommand = commandRepository.findById(commandId);
+        if (optCommand.isEmpty()) {
+            return false;
+        }
+
+        Command command = optCommand.get();
+
+        // 1. Supprimer tous les packages associés à cette commande (avec leur historique)
+        if (command.getPackages() != null && !command.getPackages().isEmpty()) {
+            for (PackageEntity packageEntity : command.getPackages()) {
+                packageService.deletePackage(packageEntity.getBarcode());
+            }
+        }
+
+        // 2. Supprimer l'historique de statut de la commande
+        historyCommandStatusService.deleteByCommand(command);
+
+        // 3. Supprimer la commande elle-même
+        commandRepository.delete(command);
         return true;
     }
 }

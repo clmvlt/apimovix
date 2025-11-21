@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import bzh.stack.apimovix.annotation.HyperAdminRequired;
 import bzh.stack.apimovix.annotation.TokenNotRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.profil.ForgotPasswordDTO;
@@ -201,5 +202,130 @@ public class ProfileController {
         }
         
         return MAPIR.noContent();
+    }
+
+    @GetMapping("/check-identifiant/{identifiant}")
+    @Operation(summary = "Check if identifiant is already used", description = "Checks if the given identifiant is already used by another profile", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully checked identifiant availability", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
+    })
+    @TokenRequired
+    public ResponseEntity<?> checkIdentifiant(
+            @Parameter(description = "Identifiant to check", required = true) @PathVariable String identifiant) {
+        boolean isUsed = profileService.isIdentifiantUsed(identifiant);
+
+        // Return a simple JSON response
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("identifiant", identifiant);
+        response.put("isUsed", isUsed);
+
+        return MAPIR.ok(response);
+    }
+
+    @GetMapping("/check-email/{email}")
+    @Operation(summary = "Check if email is already used", description = "Checks if the given email is already used by another profile", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully checked email availability", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
+    })
+    @TokenRequired
+    public ResponseEntity<?> checkEmail(
+            @Parameter(description = "Email to check", required = true) @PathVariable String email) {
+        boolean isUsed = profileService.isEmailUsed(email);
+
+        // Return a simple JSON response
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("email", email);
+        response.put("isUsed", isUsed);
+
+        return MAPIR.ok(response);
+    }
+
+    // ============================================
+    // HyperAdmin-only endpoints
+    // ============================================
+
+    @GetMapping("/hyperadmin/accounts/{accountId}")
+    @Operation(summary = "Get all profiles for a specific account (HyperAdmin only)", description = "Retrieves a list of all user profiles for any account. This operation requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved list of profiles", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = ProfilDTO.class)))),
+            @ApiResponse(responseCode = "404", description = "Account not found", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> getProfilesByAccount(
+            @Parameter(description = "UUID of the account", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String accountId) {
+        UUID accountUuid = UUID.fromString(accountId);
+        Optional<List<Profil>> profiles = profileService.findProfilesByAccountId(accountUuid);
+        if (profiles.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        List<ProfilDTO> profilDTOs = profiles.get().stream()
+                .map(profileMapper::toDto)
+                .collect(Collectors.toList());
+        return MAPIR.ok(profilDTOs);
+    }
+
+    @PostMapping("/hyperadmin/accounts/{accountId}")
+    @Operation(summary = "Create profile for a specific account (HyperAdmin only)", description = "Creates a new user profile for any account with the specified permissions and settings. This operation requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "201", description = "Successfully created profile", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ProfilDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Account not found", content = @Content),
+            @ApiResponse(responseCode = "409", description = "Conflict - Profile with similar settings already exists", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> createProfileForAccount(
+            @Parameter(description = "UUID of the account", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String accountId,
+            @Parameter(description = "Profile creation data", required = true, schema = @Schema(implementation = ProfilCreateDTO.class)) @Valid @RequestBody ProfilCreateDTO profilCreateDTO) {
+        UUID accountUuid = UUID.fromString(accountId);
+        Optional<Profil> createdProfil = profileService.createProfileForAccountByHyperAdmin(accountUuid, profilCreateDTO);
+        if (createdProfil.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.created(profileMapper.toDto(createdProfil.get()));
+    }
+
+    @PutMapping("/hyperadmin/{id}")
+    @Operation(summary = "Update any profile (HyperAdmin only)", description = "Updates any existing user profile with new permissions and settings (without password). This operation requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated profile", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ProfilDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Profile not found", content = @Content),
+            @ApiResponse(responseCode = "409", description = "Conflict - Profile with similar settings already exists", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> updateProfileByHyperAdmin(
+            @Parameter(description = "Updated profile data", required = true, schema = @Schema(implementation = ProfilUpdateDTO.class)) @Valid @RequestBody ProfilUpdateDTO profilUpdateDTO,
+            @Parameter(description = "UUID of the profile to update", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String id) {
+        UUID uuid = UUID.fromString(id);
+        Optional<Profil> optProfil = profileService.updateProfilByHyperAdmin(profilUpdateDTO, uuid);
+        if (optProfil.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.ok(profileMapper.toDto(optProfil.get()));
+    }
+
+    @DeleteMapping("/hyperadmin/{id}")
+    @Operation(summary = "Delete any profile (HyperAdmin only)", description = "Deletes any specific user profile and all its associated data. This operation requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "204", description = "Successfully deleted profile", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Profile not found", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> deleteProfileByHyperAdmin(
+            @Parameter(description = "UUID of the profile to delete", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String id) {
+        UUID uuid = UUID.fromString(id);
+        boolean deleted = profileService.deleteByHyperAdmin(uuid);
+        if (!deleted) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.deleted();
+    }
+
+    @GetMapping("/hyperadmin/{id}")
+    @Operation(summary = "Get any profile by ID (HyperAdmin only)", description = "Retrieves detailed information about any specific user profile. This operation requires HyperAdmin privileges.", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved profile details", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ProfilDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Profile not found", content = @Content),
+    })
+    @HyperAdminRequired
+    public ResponseEntity<?> getProfilByHyperAdmin(
+            @Parameter(description = "UUID of the profile to retrieve", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable @Valid @Pattern(regexp = PATTERNS.UUID_PATTERN, message = "Invalid UUID format") String id) {
+        UUID uuid = UUID.fromString(id);
+        Optional<Profil> optProfil = profileService.findProfileByIdForHyperAdmin(uuid);
+        if (optProfil.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.ok(profileMapper.toDto(optProfil.get()));
     }
 }

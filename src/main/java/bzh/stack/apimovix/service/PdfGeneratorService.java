@@ -985,24 +985,31 @@ public class PdfGeneratorService {
      * @throws IOException En cas d'erreur lors de la génération
      */
     public byte[] generatePharmacyLabel(Pharmacy pharmacy) throws IOException {
-        // Format étiquette 41x89mm
-        float height = 252.283f;  // 89mm en points
-        float width = 116.220f; // 41mm en points
+        // Format A4
+        float pageHeight = PageSize.A4.getHeight(); // 842 points
+
+        // Dimensions du label (41x89mm)
+        float labelHeight = 116.220f;  // 89mm en points
+        float labelWidth = 252.283f;   // 41mm en points
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
-        Document document = new Document(pdf, new PageSize(width, height));
+        Document document = new Document(pdf, PageSize.A4);
         document.setMargins(0, 0, 0, 0);
 
         PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
 
         PdfCanvas canvas = new PdfCanvas(pdf.addNewPage());
 
-        float margin = 5;
-        float yPosition = height;
+        // Position du label : coin en haut à gauche
+        float labelStartX = 0;
+        float labelStartY = pageHeight - labelHeight;
 
-        // Section 1: Logo centré en haut
+        float margin = 5;
+        float yPosition = labelHeight;
+
+        // Section 1: Logo centré en haut du label
         float logoSectionHeight = 40;
         try {
             File logoFile = pictureService.findImageFile("logos/logo.png");
@@ -1013,9 +1020,9 @@ public class PdfGeneratorService {
                 // Limiter la taille du logo adapté au nouveau format
                 logo.scaleToFit(140, 35);
 
-                // Centrer horizontalement en haut avec marge réduite
-                float logoX = (width - logo.getImageScaledWidth()) / 2;
-                float logoY = height - logo.getImageScaledHeight() - 3;
+                // Centrer horizontalement dans le label, positionné en haut à gauche de la page A4
+                float logoX = labelStartX + (labelWidth - logo.getImageScaledWidth()) / 2;
+                float logoY = labelStartY + labelHeight - logo.getImageScaledHeight() - 3;
                 logo.setFixedPosition(logoX, logoY);
                 document.add(logo);
             }
@@ -1026,7 +1033,7 @@ public class PdfGeneratorService {
 
         // Section 2: Nom de la pharmacie (zone réduite)
         String pharmacyName = pharmacy.getName();
-        float maxTextWidth = width - (2 * margin);
+        float maxTextWidth = labelWidth - (2 * margin);
         float maxNameSectionHeight = 40;
 
         // Police adaptée au nouveau format
@@ -1065,12 +1072,12 @@ public class PdfGeneratorService {
 
             // Centrer verticalement le bloc de texte
             float totalTextHeight = lines.size() * lineHeight;
-            float textStartY = yPosition - (maxNameSectionHeight - totalTextHeight) / 2;
+            float textStartY = labelStartY + yPosition - (maxNameSectionHeight - totalTextHeight) / 2;
 
-            // Dessiner chaque ligne centrée
+            // Dessiner chaque ligne centrée dans le label
             for (String line : lines) {
                 float lineWidth = fontBold.getWidth(line) * fontSize / 1000;
-                float lineX = (width - lineWidth) / 2;
+                float lineX = labelStartX + (labelWidth - lineWidth) / 2;
                 canvas.setFontAndSize(fontBold, fontSize);
                 canvas.beginText();
                 canvas.moveText(lineX, textStartY);
@@ -1079,9 +1086,9 @@ public class PdfGeneratorService {
                 textStartY -= lineHeight;
             }
         } else {
-            // Dessiner sur une seule ligne, parfaitement centré
-            float textX = (width - textWidth) / 2;
-            float textY = yPosition - (maxNameSectionHeight - fontSize) / 2;
+            // Dessiner sur une seule ligne, parfaitement centré dans le label
+            float textX = labelStartX + (labelWidth - textWidth) / 2;
+            float textY = labelStartY + yPosition - (maxNameSectionHeight - fontSize) / 2;
             canvas.setFontAndSize(fontBold, fontSize);
             canvas.beginText();
             canvas.moveText(textX, textY);
@@ -1104,13 +1111,13 @@ public class PdfGeneratorService {
         barcode.setX(0.75f); // Largeur des barres optimisée
 
         Image barcodeImage = new Image(barcode.createFormXObject(pdf));
-        float barcodeWidth = width - (2 * barcodeMarginLR);
+        float barcodeWidth = labelWidth - (2 * barcodeMarginLR);
         barcodeImage.setWidth(barcodeWidth);
         barcodeImage.setAutoScale(false);
 
-        // Positionner avec marges à gauche, droite et bas
-        float barcodeX = barcodeMarginLR;
-        float barcodeY = barcodeMarginBottom;
+        // Positionner avec marges à gauche, droite et bas dans le label
+        float barcodeX = labelStartX + barcodeMarginLR;
+        float barcodeY = labelStartY + barcodeMarginBottom;
         barcodeImage.setFixedPosition(barcodeX, barcodeY);
         document.add(barcodeImage);
 

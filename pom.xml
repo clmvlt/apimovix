@@ -147,16 +147,36 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>bzh.stack.apimovix.ApiMovixApplication</mainClass>
+                    <jvmArguments>-Dspring.classformat.ignore=true</jvmArguments>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Resources Plugin - Exclude macOS metadata files -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/.DS_Store</exclude>
+                        <exclude>**/._*</exclude>
+                        <exclude>**/.AppleDouble</exclude>
+                        <exclude>**/.LSOverride</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
 
             <!-- Compiler Plugin with Annotation Processing -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>3.11.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <compilerArgs>
                         <arg>-Amapstruct.verbose=true</arg>
                     </compilerArgs>
@@ -177,6 +197,12 @@
                             <version>0.2.0</version>
                         </path>
                     </annotationProcessorPaths>
+                    <excludes>
+                        <exclude>**/.DS_Store</exclude>
+                        <exclude>**/._*</exclude>
+                        <exclude>**/.AppleDouble</exclude>
+                        <exclude>**/.LSOverride</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

@@ -4,7 +4,15 @@
       "Bash(./mvnw:*)",
       "mcp__ide__getDiagnostics",
       "Bash(taskkill:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(java:*)",
+      "Bash(/usr/libexec/java_home:*)",
+      "Bash(~/.zshrc)",
+      "Bash(find:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []

@@ -92,6 +92,10 @@ public class Pharmacy {
     @JoinColumn(name = "id_zone")
     private Zone zone;
 
+    @ManyToOne
+    @JoinColumn(name = "id_account")
+    private Account account;
+
     public void mapFromDTO(PharmacyCreateDTO recipientDTO) {
         this.cip = recipientDTO.getCip();
         this.name = recipientDTO.getName();

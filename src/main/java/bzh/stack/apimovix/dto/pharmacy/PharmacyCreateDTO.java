@@ -37,4 +37,5 @@ public class PharmacyCreateDTO {
     private String commentaire;
 
     private UUID zoneId;
+    private UUID accountId;
 } 

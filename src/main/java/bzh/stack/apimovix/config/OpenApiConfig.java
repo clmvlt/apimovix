@@ -28,7 +28,7 @@ public class OpenApiConfig {
 
         // Détection automatique du protocole selon l'adresse
         String protocol = "http";
-        boolean isProduction = !serverAddress.contains("192.168.") && !serverAddress.contains("127.0.") && !serverAddress.contains("localhost");
+        boolean isProduction = !serverAddress.contains("192.168.") && !serverAddress.contains("127.0.") && !serverAddress.contains("localhost") && !serverAddress.contains("0.0.0.0");
 
         if (isProduction) {
             protocol = "https";

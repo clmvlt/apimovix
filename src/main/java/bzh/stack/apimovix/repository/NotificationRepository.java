@@ -26,6 +26,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     // Count unread notifications for an account
     long countByAccountIdAndIsReadFalse(UUID accountId);
 
+    // Find read notifications for a specific account
+    List<Notification> findByAccountIdAndIsReadTrueOrderByCreatedAtDesc(UUID accountId);
+
     // Mark all notifications as read for an account
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.account.id = :accountId AND n.isRead = false")

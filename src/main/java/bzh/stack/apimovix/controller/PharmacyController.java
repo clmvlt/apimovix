@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import bzh.stack.apimovix.annotation.HyperAdminRequired;
 import bzh.stack.apimovix.annotation.MobileRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.common.PictureDTO;
@@ -64,24 +65,25 @@ public class PharmacyController {
     private final bzh.stack.apimovix.service.PdfGeneratorService pdfGeneratorService;
 
     @GetMapping
-    @Operation(summary = "Get all pharmacies", description = "Retrieves a list of all pharmacies in the system", responses = {
+    @Operation(summary = "Get all pharmacies", description = "Retrieves a list of all pharmacies belonging to the authenticated account", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved list of pharmacies", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = PharmacyDTO.class)))),
     })
-    public ResponseEntity<?> getAllPharmacies() {
-        List<Pharmacy> pharmacies = pharmacyService.findPharmacies();
+    public ResponseEntity<?> getAllPharmacies(ServletRequest request) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        List<Pharmacy> pharmacies = pharmacyService.findPharmaciesByAccount(profil.getAccount());
         List<PharmacyDTO> pharmacyDTOs = pharmacies.stream()
                 .map(pharmacyMapper::toDto)
                 .toList();
         return MAPIR.ok(pharmacyDTOs);
     }
 
-    @MobileRequired
-    @GetMapping("/{cip}")
-    @Operation(summary = "Get pharmacy by CIP", description = "Retrieves detailed information about a specific pharmacy using its CIP code", responses = {
+    @HyperAdminRequired
+    @GetMapping("/admin/{cip}")
+    @Operation(summary = "Get pharmacy by CIP (HyperAdmin only)", description = "Retrieves detailed information about a specific pharmacy using its CIP code without account restriction. This operation requires HyperAdmin privileges.", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved pharmacy details", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyDetailDTO.class))),
             @ApiResponse(responseCode = "404", description = "Pharmacy not found", content = @Content),
     })
-    public ResponseEntity<?> getPharmacy(
+    public ResponseEntity<?> getPharmacyAdmin(
             @Parameter(description = "CIP code of the pharmacy to retrieve", required = true) @PathVariable String cip) {
         Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
         if (pharmacy.isEmpty()) {
@@ -90,16 +92,35 @@ public class PharmacyController {
         return MAPIR.ok(pharmacyMapper.toDetailDto(pharmacy.get()));
     }
 
+    @MobileRequired
+    @GetMapping("/{cip}")
+    @Operation(summary = "Get pharmacy by CIP", description = "Retrieves detailed information about a specific pharmacy using its CIP code, filtered by account", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved pharmacy details", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyDetailDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Pharmacy not found or doesn't belong to your account", content = @Content),
+    })
+    public ResponseEntity<?> getPharmacy(
+            ServletRequest request,
+            @Parameter(description = "CIP code of the pharmacy to retrieve", required = true) @PathVariable String cip) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
+        if (pharmacy.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.ok(pharmacyMapper.toDetailDto(pharmacy.get()));
+    }
+
     @PostMapping("/{cip}/picture")
-    @Operation(summary = "Upload pharmacy picture", description = "Uploads a picture associated with a specific pharmacy", responses = {
+    @Operation(summary = "Upload pharmacy picture", description = "Uploads a picture associated with a specific pharmacy, filtered by account", responses = {
             @ApiResponse(responseCode = "201", description = "Successfully uploaded pharmacy picture", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyPicture.class))),
-            @ApiResponse(responseCode = "404", description = "Pharmacy not found", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Pharmacy not found or doesn't belong to your account", content = @Content),
             @ApiResponse(responseCode = "500", description = "Internal server error while processing picture", content = @Content),
     })
     public ResponseEntity<?> uploadPicture(
+            ServletRequest request,
             @Parameter(description = "CIP code of the pharmacy to upload picture for", required = true) @PathVariable String cip,
             @Parameter(description = "Picture data in base64 format", required = true, schema = @Schema(implementation = PictureDTO.class)) @RequestBody PictureDTO body) {
-        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
+        Profil profil = (Profil) request.getAttribute("profil");
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
         if (pharmacy.isEmpty()) {
             return MAPIR.notFound();
         }
@@ -114,15 +135,17 @@ public class PharmacyController {
     }
 
     @DeleteMapping("/{cip}/picture/{id}")
-    @Operation(summary = "Delete pharmacy picture", description = "Deletes a specific picture associated with a pharmacy", responses = {
+    @Operation(summary = "Delete pharmacy picture", description = "Deletes a specific picture associated with a pharmacy, filtered by account", responses = {
             @ApiResponse(responseCode = "204", description = "Successfully deleted pharmacy picture", content = @Content),
-            @ApiResponse(responseCode = "404", description = "Pharmacy or picture not found", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Pharmacy or picture not found, or doesn't belong to your account", content = @Content),
             @ApiResponse(responseCode = "500", description = "Internal server error while deleting picture", content = @Content),
     })
     public ResponseEntity<?> deletePicture(
+            ServletRequest request,
             @Parameter(description = "CIP code of the pharmacy", required = true) @PathVariable String cip,
             @Parameter(description = "UUID of the picture to delete", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable String id) {
-        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
+        Profil profil = (Profil) request.getAttribute("profil");
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
         if (pharmacy.isEmpty()) {
             return MAPIR.notFound();
         }
@@ -138,12 +161,14 @@ public class PharmacyController {
     }
 
     @PostMapping("/search")
-    @Operation(summary = "Search pharmacies", description = "Searches for pharmacies based on provided criteria", responses = {
+    @Operation(summary = "Search pharmacies", description = "Searches for pharmacies based on provided criteria, filtered by account", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved matching pharmacies", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = PharmacyDTO.class)))),
     })
     public ResponseEntity<?> searchPharmacy(
+            ServletRequest request,
             @Parameter(description = "Search criteria for finding pharmacies", required = true, schema = @Schema(implementation = PharmacySearchDTO.class)) @RequestBody PharmacySearchDTO pharmacySearchDTO) {
-        List<Pharmacy> pharmacies = pharmacyService.searchPharmacies(pharmacySearchDTO);
+        Profil profil = (Profil) request.getAttribute("profil");
+        List<Pharmacy> pharmacies = pharmacyService.searchPharmaciesByAccount(profil.getAccount(), pharmacySearchDTO);
         List<PharmacyDTO> pharmacyDTOs = pharmacies.stream()
                 .map(pharmacyMapper::toDto)
                 .toList();
@@ -155,8 +180,10 @@ public class PharmacyController {
             @ApiResponse(responseCode = "201", description = "Successfully created pharmacy", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyDTO.class))),
     })
     public ResponseEntity<?> createPharmacy(
+            ServletRequest request,
             @Parameter(description = "Pharmacy creation data", required = true, schema = @Schema(implementation = PharmacyCreateDTO.class)) @Valid @RequestBody PharmacyCreateDTO pharmacyCreateDTO) {
-        Pharmacy pharmacy = pharmacyService.createPharmacy(pharmacyCreateDTO);
+        Profil profil = (Profil) request.getAttribute("profil");
+        Pharmacy pharmacy = pharmacyService.createPharmacy(profil.getAccount(), pharmacyCreateDTO);
         return MAPIR.created(pharmacyMapper.toDto(pharmacy));
     }
 
@@ -177,17 +204,30 @@ public class PharmacyController {
     }
 
     @GetMapping("/{cip}/exists")
-    @Operation(summary = "Check if pharmacy exists", description = "Verifies if a pharmacy exists with the given CIP code", responses = {
+    @Operation(summary = "Check if pharmacy exists", description = "Verifies if a pharmacy exists with the given CIP code for the authenticated account", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully checked pharmacy existence", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Boolean.class))),
     })
     public ResponseEntity<?> checkPharmacyExists(
+            ServletRequest request,
             @Parameter(description = "CIP code of the pharmacy to check", required = true) @PathVariable String cip) {
-        boolean exists = pharmacyService.findPharmacy(cip).isPresent();
+        Profil profil = (Profil) request.getAttribute("profil");
+        boolean exists = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip).isPresent();
         return MAPIR.ok(exists);
     }
 
+    @GetMapping("/exist/{cip}")
+    @Operation(summary = "Check if pharmacy CIP exists globally", description = "Verifies if a pharmacy exists with the given CIP code across all pharmacies in the system, regardless of account", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully checked pharmacy CIP existence", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Boolean.class))),
+    })
+    public ResponseEntity<?> checkCipExistsGlobally(
+            @Parameter(description = "CIP code of the pharmacy to check", required = true) @PathVariable String cip) {
+        boolean exists = pharmacyService.checkCipExists(cip);
+        return MAPIR.ok(exists);
+    }
+
+    @HyperAdminRequired
     @DeleteMapping("/{cip}")
-    @Operation(summary = "Delete pharmacy", description = "Deletes a specific pharmacy and all its associated data", responses = {
+    @Operation(summary = "Delete pharmacy (HyperAdmin only)", description = "Deletes a specific pharmacy and all its associated data. This operation requires HyperAdmin privileges. Related commands and anomalies will have their pharmacy reference set to null.", responses = {
             @ApiResponse(responseCode = "204", description = "Successfully deleted pharmacy", content = @Content),
             @ApiResponse(responseCode = "404", description = "Pharmacy not found", content = @Content),
             @ApiResponse(responseCode = "500", description = "Internal server error while deleting pharmacy", content = @Content)
@@ -222,16 +262,17 @@ public class PharmacyController {
     }
 
     @PostMapping(value = "/{cip}/label", produces = {MediaType.APPLICATION_PDF_VALUE, MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Generate pharmacy label with barcode", description = "Generates a PDF label with the account logo, pharmacy name and CIP barcode", responses = {
+    @Operation(summary = "Generate pharmacy label with barcode", description = "Generates a PDF label with the account logo, pharmacy name and CIP barcode, filtered by account", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully generated pharmacy label", content = @Content(mediaType = MediaType.APPLICATION_PDF_VALUE, schema = @Schema(type = "string", format = "binary"))),
-            @ApiResponse(responseCode = "404", description = "Pharmacy not found", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Pharmacy not found or doesn't belong to your account", content = @Content),
             @ApiResponse(responseCode = "406", description = "Not Acceptable - Client must accept application/pdf", content = @Content),
             @ApiResponse(responseCode = "500", description = "Internal server error while generating label", content = @Content)
     })
     public ResponseEntity<?> generatePharmacyLabel(
             ServletRequest request,
             @Parameter(description = "CIP code of the pharmacy", required = true) @PathVariable String cip) {
-        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
+        Profil profil = (Profil) request.getAttribute("profil");
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
         if (pharmacy.isEmpty()) {
             return MAPIR.notFound();
         }

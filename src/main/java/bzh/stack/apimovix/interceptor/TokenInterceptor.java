@@ -94,6 +94,18 @@ public class TokenInterceptor implements HandlerInterceptor {
 
         Profil profil = profilOpt.get();
 
+        // Vérifier que le profil est actif
+        if (Boolean.FALSE.equals(profil.getIsActive())) {
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            return false;
+        }
+
+        // Vérifier que l'account associé est actif
+        if (profil.getAccount() != null && Boolean.FALSE.equals(profil.getAccount().getIsActive())) {
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+            return false;
+        }
+
         // Vérifier les autorisations selon la hiérarchie
         if (adminRequired != null) {
             // Pour AdminRequired, seul isAdmin est accepté

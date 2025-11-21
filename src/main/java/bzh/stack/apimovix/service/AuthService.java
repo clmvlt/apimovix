@@ -37,6 +37,12 @@ public class AuthService {
                 return Optional.empty();
             }
 
+            // Vérifier que l'account associé est actif
+            if (profil.getAccount() != null && Boolean.FALSE.equals(profil.getAccount().getIsActive())) {
+                log.warn("Tentative de connexion avec un compte désactivé: {}", identifiant);
+                return Optional.empty();
+            }
+
             String hashedPassword = hashPassword(creds.getPassword());
 
             if (profil.getPasswordHash().equals(hashedPassword)) {

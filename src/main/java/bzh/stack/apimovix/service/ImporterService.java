@@ -3,7 +3,6 @@ package bzh.stack.apimovix.service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -14,6 +13,7 @@ import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
 import bzh.stack.apimovix.dto.ors.RouteResponseDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
+import bzh.stack.apimovix.dto.pharmacy.PharmacyCreateDTO;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
@@ -44,21 +44,23 @@ public class ImporterService {
     @Transactional
     public SendCommandResponseDTO sendCommand(@Valid SendCommandRequestDTO body) {
         try {
-            CompletableFuture<Sender> senderFuture = CompletableFuture.supplyAsync(() -> {
-                Optional<Sender> optSender = senderService.findSender(body.getSender().getCode());
-                return optSender.orElseGet(() -> senderService.createSender(body.getSender()));
-            });
+            // D'abord récupérer ou créer le sender (de façon synchrone)
+            Optional<Sender> optSender = senderService.findSender(body.getSender().getCode());
+            Sender sender = optSender.orElseGet(() -> senderService.createSender(body.getSender()));
 
-            CompletableFuture<Pharmacy> pharmacyFuture = CompletableFuture.supplyAsync(() -> {
-                Optional<Pharmacy> optPharmacy = pharmacyService.findPharmacy(body.getRecipient().getCip());
-                return optPharmacy.orElseGet(() -> pharmacyService.createPharmacy(body.getRecipient()));
-            });
-
-            Sender sender = senderFuture.get();
-            Pharmacy pharmacy = pharmacyFuture.get();
+            // Ensuite, créer ou récupérer la pharmacy (uniquement par CIP, sans vérifier l'account)
+            Optional<Pharmacy> optPharmacy = pharmacyService.findPharmacyByCipOnly(body.getRecipient().getCip());
+            Pharmacy pharmacy;
+            if (optPharmacy.isPresent()) {
+                pharmacy = optPharmacy.get();
+            } else {
+                // Si la pharmacy n'existe pas, on l'associe au compte du sender
+                PharmacyCreateDTO pharmacyDTO = body.getRecipient();
+                pharmacy = pharmacyService.createPharmacy(sender.getAccount(), pharmacyDTO);
+            }
 
             // Vérifier si c'est une nouvelle commande avant de la créer
-            boolean isNewCommand = commandService.findPharmacyCommandByDate(pharmacy.getCip(), body.getExpedition_date()).isEmpty();
+            boolean isNewCommand = commandService.findPharmacyCommandByDate(sender.getAccount(), pharmacy.getCip(), body.getExpedition_date()).isEmpty();
 
             Command command = createOrUpdateCommand(pharmacy, sender, body);
 
@@ -81,7 +83,7 @@ public class ImporterService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     protected Command createOrUpdateCommand(Pharmacy pharmacy, Sender sender, SendCommandRequestDTO body) {
-        Optional<Command> optCommand = commandService.findPharmacyCommandByDate(pharmacy.getCip(), body.getExpedition_date());
+        Optional<Command> optCommand = commandService.findPharmacyCommandByDate(sender.getAccount(), pharmacy.getCip(), body.getExpedition_date());
 
         if (optCommand.isEmpty()) {
             Boolean newPharmacy = pharmacy.getNeverOrdered();

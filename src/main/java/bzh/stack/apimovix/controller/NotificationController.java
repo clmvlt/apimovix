@@ -1,6 +1,8 @@
 package bzh.stack.apimovix.controller;
 
+import bzh.stack.apimovix.annotation.HyperAdminRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
+import bzh.stack.apimovix.dto.notification.NotificationCreateDTO;
 import bzh.stack.apimovix.dto.notification.NotificationDTO;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Profil;
@@ -15,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -107,6 +110,30 @@ public class NotificationController {
         } catch (Exception e) {
             log.error("Error marking all notifications as read for account {}: {}", account.getId(), e.getMessage(), e);
             return MAPIR.badRequest("Failed to mark all notifications as read: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/create")
+    @HyperAdminRequired
+    @Operation(
+            summary = "[HyperAdmin] Create a notification for an account",
+            description = "Create a new notification for a specific account. This endpoint is restricted to HyperAdmin users only."
+    )
+    @ApiResponse(responseCode = "200", description = "Notification successfully created",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = NotificationDTO.class)))
+    @ApiResponse(responseCode = "400", description = GLOBAL.ERROR_400, content = @Content)
+    @ApiResponse(responseCode = "401", description = GLOBAL.ERROR_401, content = @Content)
+    public ResponseEntity<?> createNotification(@Valid @RequestBody NotificationCreateDTO createDTO) {
+        log.info("POST /notifications/create - accountId: {}, type: {}, title: {}",
+                createDTO.getAccountId(), createDTO.getType(), createDTO.getTitle());
+
+        try {
+            NotificationDTO notification = notificationService.createNotification(createDTO);
+            return MAPIR.ok(notification);
+        } catch (Exception e) {
+            log.error("Error creating notification for account {}: {}", createDTO.getAccountId(), e.getMessage(), e);
+            return MAPIR.badRequest("Failed to create notification: " + e.getMessage());
         }
     }
 }

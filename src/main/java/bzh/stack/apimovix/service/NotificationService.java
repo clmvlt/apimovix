@@ -29,12 +29,33 @@ public class NotificationService {
 
     /**
      * Get all notifications for a specific account
+     * Returns all unread notifications + max 10 read notifications
      */
     @Transactional(readOnly = true)
     public List<NotificationDTO> getNotificationsByAccountId(UUID accountId) {
-        log.info("Fetching all notifications for account: {}", accountId);
-        List<Notification> notifications = notificationRepository.findByAccountIdOrderByCreatedAtDesc(accountId);
-        return notifications.stream()
+        log.info("Fetching notifications for account: {}", accountId);
+
+        // Get all unread notifications
+        List<Notification> unreadNotifications = notificationRepository.findByAccountIdAndIsReadFalseOrderByCreatedAtDesc(accountId);
+
+        // Get read notifications (limit to 10)
+        List<Notification> readNotifications = notificationRepository.findByAccountIdAndIsReadTrueOrderByCreatedAtDesc(accountId);
+        List<Notification> limitedReadNotifications = readNotifications.stream()
+                .limit(10)
+                .collect(Collectors.toList());
+
+        // Combine both lists
+        List<Notification> allNotifications = new java.util.ArrayList<>();
+        allNotifications.addAll(unreadNotifications);
+        allNotifications.addAll(limitedReadNotifications);
+
+        // Sort by createdAt descending to maintain order
+        allNotifications.sort((n1, n2) -> n2.getCreatedAt().compareTo(n1.getCreatedAt()));
+
+        log.info("Returning {} unread + {} read notifications for account: {}",
+                unreadNotifications.size(), limitedReadNotifications.size(), accountId);
+
+        return allNotifications.stream()
                 .map(notificationMapper::toDTO)
                 .collect(Collectors.toList());
     }

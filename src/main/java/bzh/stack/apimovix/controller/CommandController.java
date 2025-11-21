@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import bzh.stack.apimovix.annotation.AdminRequired;
+import bzh.stack.apimovix.annotation.HyperAdminRequired;
 import bzh.stack.apimovix.annotation.MobileRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.command.CommandBasicDTO;
@@ -117,13 +119,14 @@ public class CommandController {
     }
 
     @GetMapping("/pharmacy/{cip}/last-commands")
-    @Operation(summary = "Get last 5 commands by pharmacy CIP", description = "Retrieves the last 5 commands for a specific pharmacy using its CIP", responses = {
+    @Operation(summary = "Get last 5 commands by pharmacy CIP", description = "Retrieves the last 5 commands for a specific pharmacy using its CIP, filtered by account", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved last 5 commands", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = CommandBasicDTO.class)))),
     })
     public ResponseEntity<?> getLast5CommandsByPharmacyCip(
             HttpServletRequest request,
             @Parameter(description = "CIP of the pharmacy to retrieve commands for", required = true) @PathVariable String cip) {
-        List<Command> commands = commandService.findLast5CommandsByPharmacyCip(cip);
+        Profil profil = (Profil) request.getAttribute("profil");
+        List<Command> commands = commandService.findLast5CommandsByPharmacyCip(profil.getAccount(), cip);
         List<CommandBasicDTO> commandDTOs = commands.stream()
                 .map(commandMapper::toBasicDTO)
                 .collect(Collectors.toList());
@@ -277,5 +280,39 @@ public class CommandController {
         response.setPackages(body.getCommand().getPackages());
         response.setStatus("success");
         return MAPIR.ok(response);
+    }
+
+    @GetMapping("/hyperadmin/{id}")
+    @HyperAdminRequired
+    @Operation(summary = "Get command by ID (HyperAdmin)", description = "Retrieves detailed information about any command without account restriction (HyperAdmin only)", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved command details", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = CommandDetailDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Command not found", content = @Content),
+    })
+    public ResponseEntity<?> getCommandHyperAdmin(
+            HttpServletRequest request,
+            @Parameter(description = "UUID of the command to retrieve", required = true, schema = @Schema(type = "string", format = "uuid")) @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.PATH_INVALID_FORMAT_UUID) @PathVariable String id) {
+        UUID uuid = UUID.fromString(id);
+        Optional<Command> optCommand = commandService.findByIdHyperAdmin(uuid);
+        if (optCommand.isEmpty()) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.ok(commandMapper.toDetailDTO(optCommand.get()));
+    }
+
+    @DeleteMapping("/{id}")
+    @HyperAdminRequired
+    @Operation(summary = "Delete command", description = "Deletes a command and all its associated packages (HyperAdmin only)", responses = {
+            @ApiResponse(responseCode = "204", description = "Command successfully deleted", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Command not found", content = @Content),
+    })
+    public ResponseEntity<?> deleteCommand(
+            HttpServletRequest request,
+            @Parameter(description = "UUID of the command to delete", required = true, schema = @Schema(type = "string", format = "uuid")) @Pattern(regexp = PATTERNS.UUID_PATTERN, message = GLOBAL.PATH_INVALID_FORMAT_UUID) @PathVariable String id) {
+        UUID uuid = UUID.fromString(id);
+        boolean deleted = commandService.deleteCommandHyperAdmin(uuid);
+        if (!deleted) {
+            return MAPIR.notFound();
+        }
+        return MAPIR.noContent();
     }
 }

@@ -21,6 +21,7 @@ import bzh.stack.apimovix.mapper.ProfileMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.PasswordResetToken;
 import bzh.stack.apimovix.model.Profil;
+import bzh.stack.apimovix.repository.AccountRepository;
 import bzh.stack.apimovix.repository.PasswordResetTokenRepository;
 import bzh.stack.apimovix.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class ProfileService {
     private final ProfileMapper profileMapper;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final AccountRepository accountRepository;
 
     @Transactional(readOnly = true)
     public Optional<Profil> findProfile(Account account, UUID id) {
@@ -355,21 +357,147 @@ public class ProfileService {
             """.formatted(name, resetUrl, resetUrl, resetUrl);
     }
 
+    /**
+     * Check if an identifiant is already used
+     */
+    @Transactional(readOnly = true)
+    public boolean isIdentifiantUsed(String identifiant) {
+        return profileRepository.existsByIdentifiant(identifiant);
+    }
+
+    /**
+     * Check if an email is already used
+     */
+    @Transactional(readOnly = true)
+    public boolean isEmailUsed(String email) {
+        return profileRepository.existsByEmail(email);
+    }
+
     private String hashPassword(String password) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
-            
+
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
                 if (hex.length() == 1) hexString.append('0');
                 hexString.append(hex);
             }
-            
+
             return hexString.toString();
         } catch (NoSuchAlgorithmException e) {
             return "";
         }
+    }
+
+    // ============================================
+    // HyperAdmin-only methods
+    // ============================================
+
+    /**
+     * Find all profiles for a specific account (HyperAdmin only)
+     */
+    @Transactional(readOnly = true)
+    public Optional<List<Profil>> findProfilesByAccountId(UUID accountId) {
+        Optional<Account> optAccount = accountRepository.findById(accountId);
+        if (optAccount.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Profil> profiles = profileRepository.findProfiles(optAccount.get());
+        return Optional.of(profiles);
+    }
+
+    /**
+     * Create profile for a specific account (HyperAdmin only)
+     */
+    @Transactional
+    public Optional<Profil> createProfileForAccountByHyperAdmin(UUID accountId, ProfilCreateDTO createDTO) {
+        Optional<Account> optAccount = accountRepository.findById(accountId);
+        if (optAccount.isEmpty()) {
+            return Optional.empty();
+        }
+        Account account = optAccount.get();
+
+        // Vérifier la limite de profils
+        long currentProfileCount = profileRepository.countByAccount(account);
+        Integer maxProfiles = account.getMaxProfiles();
+
+        if (maxProfiles != null && maxProfiles > 0 && currentProfileCount >= maxProfiles) {
+            throw new ProfileLimitExceededException((int) currentProfileCount, maxProfiles);
+        }
+
+        // Vérifier les champs uniques
+        if (Boolean.TRUE.equals(createDTO.getIsWeb()) && profileRepository.existsByEmail(createDTO.getEmail())) {
+            throw new FieldAlreadyUsed("email");
+        }
+        if (profileRepository.existsByIdentifiant(createDTO.getIdentifiant())) {
+            throw new FieldAlreadyUsed("identifiant");
+        }
+
+        Profil profil = new Profil();
+        profileMapper.updateEntityFromCreateDto(createDTO, profil);
+        profil.setPasswordHash(hashPassword(createDTO.getPassword()));
+        profil.setAccount(account);
+        profil.setId(UUID.randomUUID());
+        profil.setToken(generateSecureToken());
+
+        // Si isActive n'est pas spécifié, mettre à true par défaut
+        if (profil.getIsActive() == null) {
+            profil.setIsActive(true);
+        }
+
+        return Optional.of(profileRepository.save(profil));
+    }
+
+    /**
+     * Update any profile (HyperAdmin only)
+     */
+    @Transactional
+    public Optional<Profil> updateProfilByHyperAdmin(ProfilUpdateDTO updateDTO, UUID profilId) {
+        Optional<Profil> optProfil = profileRepository.findById(profilId);
+        if (optProfil.isEmpty()) {
+            return Optional.empty();
+        }
+        Profil profil = optProfil.get();
+
+        // Valider l'email seulement si isWeb est true et que l'email est fourni
+        if (Boolean.TRUE.equals(updateDTO.getIsWeb()) && updateDTO.getEmail() != null &&
+            profileRepository.existsByEmailAndIdNot(updateDTO.getEmail(), profilId)) {
+            throw new FieldAlreadyUsed("email");
+        }
+
+        // Valider l'identifiant seulement s'il est fourni et différent de l'actuel
+        if (updateDTO.getIdentifiant() != null && !updateDTO.getIdentifiant().trim().isEmpty() &&
+            !updateDTO.getIdentifiant().equals(profil.getIdentifiant()) &&
+            profileRepository.existsByIdentifiantAndIdNot(updateDTO.getIdentifiant(), profilId)) {
+            throw new FieldAlreadyUsed("identifiant");
+        }
+
+        profileMapper.updateEntityFromUpdateDto(updateDTO, profil);
+        return Optional.of(profileRepository.save(profil));
+    }
+
+    /**
+     * Delete any profile (HyperAdmin only)
+     */
+    @Transactional
+    public boolean deleteByHyperAdmin(UUID uuid) {
+        Optional<Profil> optProfil = profileRepository.findById(uuid);
+        if (optProfil.isEmpty()) {
+            return false;
+        }
+        Profil profil = optProfil.get();
+        profil.setDeleted(true);
+        profileRepository.save(profil);
+        return true;
+    }
+
+    /**
+     * Find any profile by ID (HyperAdmin only)
+     */
+    @Transactional(readOnly = true)
+    public Optional<Profil> findProfileByIdForHyperAdmin(UUID id) {
+        return profileRepository.findById(id);
     }
 } 
