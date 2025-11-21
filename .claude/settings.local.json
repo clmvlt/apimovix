@@ -12,7 +12,8 @@
       "Bash(/usr/libexec/java_home:*)",
       "Bash(~/.zshrc)",
       "Bash(find:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

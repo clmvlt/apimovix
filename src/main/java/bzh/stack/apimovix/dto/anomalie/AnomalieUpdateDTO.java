@@ -17,6 +17,6 @@ public class AnomalieUpdateDTO {
 
     @NotBlank(message = "Comment cannot be blank")
     @Size(max = 1000, message = "Comment cannot exceed 1000 characters")
-    @Schema(description = "Updated comment for the anomaly", example = "Updated comment regarding the delivery issue", required = true)
+    @Schema(description = "Updated comment for the anomaly", example = "Updated comment regarding the delivery issue", nullable = false)
     private String comment;
 }
