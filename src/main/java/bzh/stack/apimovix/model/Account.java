@@ -9,20 +9,29 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
+import bzh.stack.apimovix.model.Picture.AccountLogo;
 import bzh.stack.apimovix.util.PATTERNS;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "account")
 public class Account {
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue
     @Column(name = "id")
@@ -36,7 +45,16 @@ public class Account {
     
     @Column(name = "address2")
     private String address2;
-    
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "country")
+    private String country;
+
     @Column(name = "is_active")
     private Boolean isActive;
     
@@ -97,4 +115,8 @@ public class Account {
     @OneToMany(mappedBy = "account")
     @JsonBackReference
     private List<Profil> profils = new ArrayList<>();
+
+    @OneToOne(mappedBy = "account", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private AccountLogo logo;
 } 

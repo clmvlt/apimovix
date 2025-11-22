@@ -347,28 +347,32 @@ public class CommandService {
         String city = searchDTO.getPharmacyCity();
         String address = searchDTO.getPharmacyAddress();
 
+        // Convertir en minuscules pour la recherche insensible à la casse
         if (name != null) {
+            name = name.toLowerCase();
             for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (name.toLowerCase().contains(alias.getKey())) {
-                    name = name.toLowerCase().replace(alias.getKey(), alias.getValue());
+                if (name.contains(alias.getKey())) {
+                    name = name.replace(alias.getKey(), alias.getValue());
                     break;
                 }
             }
         }
 
         if (city != null) {
+            city = city.toLowerCase();
             for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (city.toLowerCase().contains(alias.getKey())) {
-                    city = city.toLowerCase().replace(alias.getKey(), alias.getValue());
+                if (city.contains(alias.getKey())) {
+                    city = city.replace(alias.getKey(), alias.getValue());
                     break;
                 }
             }
         }
 
         if (address != null) {
+            address = address.toLowerCase();
             for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (address.toLowerCase().contains(alias.getKey())) {
-                    address = address.toLowerCase().replace(alias.getKey(), alias.getValue());
+                if (address.contains(alias.getKey())) {
+                    address = address.replace(alias.getKey(), alias.getValue());
                     break;
                 }
             }
@@ -391,8 +395,14 @@ public class CommandService {
             endDate = endDate.toLocalDate().atTime(23, 59, 59);
         }
 
+        Integer maxResults = searchDTO.getMax();
+        if (maxResults == null || maxResults <= 0) {
+            maxResults = 200;
+        }
+
+        List<CommandSearchResponseDTO> results;
         if (startDate == null) {
-            return commandRepository.searchCommandsWithoutDates(
+            results = commandRepository.searchCommandsWithoutDates(
                     account,
                     name,
                     city,
@@ -401,7 +411,7 @@ public class CommandService {
                     address,
                     commandId);
         } else {
-            return commandRepository.searchCommandsWithDates(
+            results = commandRepository.searchCommandsWithDates(
                     account,
                     name,
                     city,
@@ -412,6 +422,11 @@ public class CommandService {
                     startDate,
                     endDate);
         }
+
+        if (results.size() > maxResults) {
+            return results.subList(0, maxResults);
+        }
+        return results;
     }
 
     @Transactional

@@ -91,6 +91,11 @@ public class TourService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<Tour> findTourForTarif(Account account, String tourId) {
+        return Optional.ofNullable(tourRepository.findTourForTarif(account, tourId));
+    }
+
+    @Transactional(readOnly = true)
     public List<Tour> findTours(Account account, LocalDate date) {
         // Charger les tours sans les commands pour éviter le produit cartésien
         List<Tour> tours = tourRepository.findToursOptimizedByDate(account, date);

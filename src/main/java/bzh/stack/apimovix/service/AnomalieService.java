@@ -84,12 +84,19 @@ public class AnomalieService {
         // Vérifier si des dates sont fournies
         boolean hasDateDebut = searchDTO.getDateDebut() != null && !searchDTO.getDateDebut().isEmpty();
         boolean hasDateFin = searchDTO.getDateFin() != null && !searchDTO.getDateFin().isEmpty();
-        
+
+        Integer maxResults = searchDTO.getMax();
+        if (maxResults == null || maxResults <= 0) {
+            maxResults = 200;
+        }
+
+        List<Anomalie> results;
+
         if (hasDateDebut || hasDateFin) {
             // Conversion des dates
             LocalDateTime dateDebut = null;
             LocalDateTime dateFin = null;
-            
+
             if (hasDateDebut) {
                 LocalDate debut = LocalDate.parse(searchDTO.getDateDebut());
                 dateDebut = debut.atStartOfDay();
@@ -97,7 +104,7 @@ public class AnomalieService {
                 // Si pas de date de début, utiliser une date très ancienne
                 dateDebut = LocalDateTime.of(1900, 1, 1, 0, 0);
             }
-            
+
             if (hasDateFin) {
                 LocalDate fin = LocalDate.parse(searchDTO.getDateFin());
                 dateFin = fin.atTime(LocalTime.MAX); // Fin de la journée
@@ -105,8 +112,8 @@ public class AnomalieService {
                 // Si pas de date de fin, utiliser une date très future
                 dateFin = LocalDateTime.of(2100, 12, 31, 23, 59, 59);
             }
-            
-            return anomalieRepository.searchAnomaliesWithDateRange(
+
+            results = anomalieRepository.searchAnomaliesWithDateRange(
                 account,
                 searchDTO.getUserId(),
                 dateDebut,
@@ -116,13 +123,18 @@ public class AnomalieService {
             );
         } else {
             // Pas de filtres de date
-            return anomalieRepository.searchAnomalies(
+            results = anomalieRepository.searchAnomalies(
                 account,
                 searchDTO.getUserId(),
                 searchDTO.getCip(),
                 searchDTO.getTypeCode()
             );
         }
+
+        if (results.size() > maxResults) {
+            return results.subList(0, maxResults);
+        }
+        return results;
     }
 
     @Transactional
@@ -131,7 +143,7 @@ public class AnomalieService {
         if (typeAnomalieOptional.isEmpty()) {
             return Optional.empty();
         }
-        Optional<Pharmacy> pharmacyOptional = pharmacyService.findPharmacy(anomalieCreateDTO.getCip());
+        Optional<Pharmacy> pharmacyOptional = pharmacyService.findPharmacy(anomalieCreateDTO.getCip(), profil.getAccount().getId());
         if (pharmacyOptional.isEmpty()) {
             return Optional.empty();
         }

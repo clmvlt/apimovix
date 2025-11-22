@@ -14,6 +14,9 @@ public class AccountDTO {
     private String societe;
     private String address1;
     private String address2;
+    private String postalCode;
+    private String city;
+    private String country;
     private Boolean isActive;
     
     @JsonFormat(pattern = PATTERNS.DATETIME)
@@ -29,4 +32,5 @@ public class AccountDTO {
     private Boolean isScanCIP;
     private Boolean autoSendAnomalieEmails;
     private Boolean autoCreateTour;
+    private String logoUrl;
 }

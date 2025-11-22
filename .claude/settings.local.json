@@ -13,7 +13,13 @@
       "Bash(~/.zshrc)",
       "Bash(find:*)",
       "Bash(lsof:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(timeout 30 ./mvnw spring-boot:run:*)",
+      "Bash(timeout 45 ./mvnw spring-boot:run:*)",
+      "Bash(echo:*)",
+      "Bash(timeout 10 sleep:*)",
+      "Bash(timeout 15 sleep:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

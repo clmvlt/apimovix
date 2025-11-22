@@ -111,4 +111,24 @@ public class ImageController {
 
         return MAPIR.file(file);
     }
+
+    @GetMapping("/account/{accountId}/{imageId}")
+    @Operation(summary = "Get account logo", description = "Retrieves the logo associated with a specific account using account ID and image ID", responses = {
+            @ApiResponse(responseCode = "200", description = "Logo successfully retrieved", content = @Content(mediaType = "image/*")),
+            @ApiResponse(responseCode = "404", description = "Logo not found", content = @Content)
+    })
+    public ResponseEntity<?> getAccountLogo(
+            @Parameter(description = "ID of the account", required = true) @PathVariable String accountId,
+            @Parameter(description = "ID of the logo to retrieve", required = true) @PathVariable String imageId)
+            throws IOException {
+
+        String path = String.format("account/%s/%s", accountId, imageId);
+
+        File file = pictureService.findImageFile(path);
+        if (file == null) {
+            return MAPIR.notFound();
+        }
+
+        return MAPIR.file(file);
+    }
 }

@@ -7,6 +7,7 @@ public class ApiStatusDTO {
     private String version;
     private String dbVersion;
     private boolean dbConnected;
+    private String databaseUrl;
     private String status;
     private String timestamp;
     private String environment;
@@ -18,20 +19,22 @@ public class ApiStatusDTO {
     public ApiStatusDTO() {
     }
 
-    public ApiStatusDTO(String version, String dbVersion, boolean dbConnected, String status, String timestamp, String environment) {
+    public ApiStatusDTO(String version, String dbVersion, boolean dbConnected, String databaseUrl, String status, String timestamp, String environment) {
         this.version = version;
         this.dbVersion = dbVersion;
         this.dbConnected = dbConnected;
+        this.databaseUrl = databaseUrl;
         this.status = status;
         this.timestamp = timestamp;
         this.environment = environment;
     }
 
-    public ApiStatusDTO(String version, String dbVersion, boolean dbConnected, String status, String timestamp, String environment,
+    public ApiStatusDTO(String version, String dbVersion, boolean dbConnected, String databaseUrl, String status, String timestamp, String environment,
             double cpuUsage, long totalMemory, long usedMemory, long freeMemory) {
         this.version = version;
         this.dbVersion = dbVersion;
         this.dbConnected = dbConnected;
+        this.databaseUrl = databaseUrl;
         this.status = status;
         this.timestamp = timestamp;
         this.environment = environment;

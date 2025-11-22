@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import bzh.stack.apimovix.model.Account;
-import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.util.PATTERNS;
 import bzh.stack.apimovix.util.UrlUtil;
 import jakarta.persistence.Column;
@@ -18,14 +17,19 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Table(name = "pharmacy_picture")
-@Data
-public class PharmacyPicture {
+@Table(name = "account_logo")
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class AccountLogo {
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id")
@@ -34,13 +38,9 @@ public class PharmacyPicture {
     @Column(name = "name")
     private String name;
 
-    @ManyToOne
-    @JoinColumn(name = "cip")
-    @JsonBackReference
-    private Pharmacy pharmacy;
-
-    @ManyToOne
+    @OneToOne
     @JoinColumn(name = "id_account")
+    @JsonBackReference
     private Account account;
 
     @CreationTimestamp
@@ -51,4 +51,4 @@ public class PharmacyPicture {
     public String getImagePath() {
         return UrlUtil.getBaseUrl() + "/images/" + name;
     }
-} 
+}

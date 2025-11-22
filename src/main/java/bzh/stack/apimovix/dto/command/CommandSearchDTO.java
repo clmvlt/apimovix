@@ -18,7 +18,9 @@ public class CommandSearchDTO {
     
     @JsonFormat(pattern = PATTERNS.DATETIME)
     private LocalDateTime startDate;
-    
+
     @JsonFormat(pattern = PATTERNS.DATETIME)
     private LocalDateTime endDate;
+
+    private Integer max;
 } 

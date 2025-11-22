@@ -11,29 +11,65 @@ import bzh.stack.apimovix.model.Pharmacy;
 
 @Repository
 public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
-    
-    @Query("SELECT DISTINCT p FROM Pharmacy p LEFT JOIN FETCH p.pictures WHERE p.account IS NOT NULL")
-    List<Pharmacy> findPharmacies();
 
-    @Query("SELECT DISTINCT p FROM Pharmacy p LEFT JOIN FETCH p.pictures WHERE p.account.id = :accountId")
-    List<Pharmacy> findPharmaciesByAccount(@Param("accountId") java.util.UUID accountId);
+    @Query("SELECT DISTINCT p FROM Pharmacy p")
+    List<Pharmacy> findAllPharmaciesBase();
 
-    @Query("SELECT p FROM Pharmacy p LEFT JOIN FETCH p.pictures WHERE p.cip = :cip AND p.account IS NOT NULL")
-    Pharmacy findPharmacy(@Param("cip") String cip);
+    @Query("SELECT DISTINCT p FROM Pharmacy p LEFT JOIN FETCH p.pharmacyInformationsList WHERE p IN :pharmacies")
+    List<Pharmacy> fetchInformationsForPharmacies(@Param("pharmacies") List<Pharmacy> pharmacies);
 
-    @Query("SELECT p FROM Pharmacy p LEFT JOIN FETCH p.pictures WHERE p.cip = :cip AND p.account.id = :accountId")
-    Pharmacy findPharmacyByAccount(@Param("cip") String cip, @Param("accountId") java.util.UUID accountId);
+    default List<Pharmacy> findPharmacies(java.util.UUID accountId) {
+        // Fetch all pharmacies first
+        List<Pharmacy> pharmacies = findAllPharmaciesBase();
+        if (!pharmacies.isEmpty()) {
+            // Fetch informations
+            pharmacies = fetchInformationsForPharmacies(pharmacies);
+        }
+        return pharmacies;
+    }
 
-    @Query("SELECT p FROM Pharmacy p LEFT JOIN FETCH p.pictures WHERE p.cip = :cip")
+    default List<Pharmacy> findPharmaciesByAccount(java.util.UUID accountId) {
+        // Fetch all pharmacies first
+        List<Pharmacy> pharmacies = findAllPharmaciesBase();
+        if (!pharmacies.isEmpty()) {
+            // Fetch informations
+            pharmacies = fetchInformationsForPharmacies(pharmacies);
+            // Load the correct PharmacyInformations for each pharmacy
+            if (accountId != null) {
+                pharmacies.forEach(p -> p.loadPharmacyInformationsForAccount(accountId));
+            }
+        }
+        return pharmacies;
+    }
+
+    @Query("SELECT p FROM Pharmacy p WHERE p.cip = :cip")
+    Pharmacy findPharmacyBase(@Param("cip") String cip);
+
+    @Query("SELECT p FROM Pharmacy p LEFT JOIN FETCH p.pharmacyInformationsList WHERE p.cip = :cip")
+    Pharmacy fetchInformationsForPharmacy(@Param("cip") String cip);
+
+    default Pharmacy findPharmacy(String cip, java.util.UUID accountId) {
+        Pharmacy pharmacy = findPharmacyBase(cip);
+        if (pharmacy != null) {
+            pharmacy = fetchInformationsForPharmacy(cip);
+        }
+        return pharmacy;
+    }
+
+    default Pharmacy findPharmacyByAccount(String cip, java.util.UUID accountId) {
+        Pharmacy pharmacy = findPharmacy(cip, accountId);
+        if (pharmacy != null && accountId != null) {
+            pharmacy.loadPharmacyInformationsForAccount(accountId);
+        }
+        return pharmacy;
+    }
+
+    @Query("SELECT p FROM Pharmacy p WHERE p.cip = :cip")
     Pharmacy findPharmacyByCipOnly(@Param("cip") String cip);
 
-    @Query(value = "SELECT DISTINCT p.* FROM pharmacy p " +
-           "LEFT JOIN pharmacy_picture pp ON p.cip = pp.cip " +
-           "WHERE p.id_account IS NOT NULL " +
-           "AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
-           "AND (:city IS NULL OR " +
-           "    (LOWER(p.city) LIKE LOWER(CONCAT('%', :city, '%')) OR " +
-           "     (:cityAlias IS NOT NULL AND LOWER(p.city) LIKE LOWER(CONCAT('%', :cityAlias, '%'))))) " +
+    @Query(value = "SELECT p.cip FROM pharmacy p " +
+           "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+           "AND (:city IS NULL OR LOWER(p.city) LIKE LOWER(CONCAT('%', :city, '%'))) " +
            "AND (:postalCode IS NULL OR LOWER(p.postal_code) LIKE LOWER(CONCAT('%', :postalCode, '%'))) " +
            "AND (:cip IS NULL OR LOWER(p.cip) LIKE LOWER(CONCAT('%', :cip, '%'))) " +
            "AND (:address IS NULL OR " +
@@ -43,49 +79,60 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
            "AND (:isLocationValid IS NULL OR " +
            "    (:isLocationValid = true AND p.latitude IS NOT NULL AND p.latitude != 0 AND p.longitude IS NOT NULL AND p.longitude != 0) OR " +
            "    (:isLocationValid = false AND (p.latitude IS NULL OR p.latitude = 0 OR p.longitude IS NULL OR p.longitude = 0))) " +
-           "AND (:zoneId IS NULL OR " +
-           "    (:zoneId = 'none' AND p.id_zone IS NULL) OR " +
-           "    (:zoneId IS NOT NULL AND :zoneId != 'none' AND CAST(p.id_zone AS VARCHAR) = :zoneId)) " +
-           "AND (:hasOrdered IS NULL OR " +
-           "    (:hasOrdered = true AND (p.never_ordered IS NULL OR p.never_ordered = false)) OR " +
-           "    (:hasOrdered = false AND p.never_ordered = true))" +
            " ORDER BY p.cip LIMIT :maxResults",
            nativeQuery = true)
-    List<Pharmacy> searchPharmacies(
+    List<String> searchPharmaciesCips(
         @Param("name") String name,
         @Param("city") String city,
-        @Param("cityAlias") String cityAlias,
         @Param("postalCode") String postalCode,
         @Param("cip") String cip,
         @Param("address") String address,
         @Param("isLocationValid") Boolean isLocationValid,
-        @Param("maxResults") Integer maxResults,
-        @Param("zoneId") String zoneId,
-        @Param("hasOrdered") Boolean hasOrdered
+        @Param("maxResults") Integer maxResults
     );
 
+    @Query("SELECT DISTINCT p FROM Pharmacy p WHERE p.cip IN :cips ORDER BY p.cip")
+    List<Pharmacy> findPharmaciesByCipsBase(@Param("cips") List<String> cips);
+
+    @Query("SELECT DISTINCT p FROM Pharmacy p LEFT JOIN FETCH p.pharmacyInformationsList WHERE p.cip IN :cips ORDER BY p.cip")
+    List<Pharmacy> fetchPharmacyInformationsForCips(@Param("cips") List<String> cips);
+
+    default List<Pharmacy> findPharmaciesByCips(List<String> cips, java.util.UUID accountId) {
+        if (cips == null || cips.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+        // Fetch pharmacies first
+        List<Pharmacy> pharmacies = findPharmaciesByCipsBase(cips);
+        if (!pharmacies.isEmpty()) {
+            // Then fetch informations
+            pharmacies = fetchPharmacyInformationsForCips(cips);
+        }
+        return pharmacies;
+    }
+
     @Query(value = "SELECT DISTINCT p.* FROM pharmacy p " +
+           "LEFT JOIN pharmacy_informations pi ON p.cip = pi.cip " +
            "LEFT JOIN pharmacy_picture pp ON p.cip = pp.cip " +
-           "WHERE CAST(p.id_account AS VARCHAR) = :accountId " +
+           "WHERE CAST(pi.id_account AS VARCHAR) = :accountId " +
            "AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:city IS NULL OR " +
-           "    (LOWER(p.city) LIKE LOWER(CONCAT('%', :city, '%')) OR " +
-           "     (:cityAlias IS NOT NULL AND LOWER(p.city) LIKE LOWER(CONCAT('%', :cityAlias, '%'))))) " +
-           "AND (:postalCode IS NULL OR LOWER(p.postal_code) LIKE LOWER(CONCAT('%', :postalCode, '%'))) " +
+           "    (LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :city, '%')) OR " +
+           "     (:cityAlias IS NOT NULL AND LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :cityAlias, '%'))))) " +
+           "AND (:postalCode IS NULL OR LOWER(COALESCE(pi.postal_code, p.postal_code)) LIKE LOWER(CONCAT('%', :postalCode, '%'))) " +
            "AND (:cip IS NULL OR LOWER(p.cip) LIKE LOWER(CONCAT('%', :cip, '%'))) " +
            "AND (:address IS NULL OR " +
-           "    LOWER(p.address1) LIKE LOWER(CONCAT('%', :address, '%')) OR " +
-           "    LOWER(p.address2) LIKE LOWER(CONCAT('%', :address, '%')) OR " +
-           "    LOWER(p.address3) LIKE LOWER(CONCAT('%', :address, '%'))) " +
+           "    LOWER(COALESCE(pi.address1, p.address1)) LIKE LOWER(CONCAT('%', :address, '%')) OR " +
+           "    LOWER(COALESCE(pi.address2, p.address2)) LIKE LOWER(CONCAT('%', :address, '%')) OR " +
+           "    LOWER(COALESCE(pi.address3, p.address3)) LIKE LOWER(CONCAT('%', :address, '%'))) " +
            "AND (:isLocationValid IS NULL OR " +
-           "    (:isLocationValid = true AND p.latitude IS NOT NULL AND p.latitude != 0 AND p.longitude IS NOT NULL AND p.longitude != 0) OR " +
-           "    (:isLocationValid = false AND (p.latitude IS NULL OR p.latitude = 0 OR p.longitude IS NULL OR p.longitude = 0))) " +
+           "    (:isLocationValid = true AND COALESCE(pi.latitude, p.latitude) IS NOT NULL AND COALESCE(pi.latitude, p.latitude) != 0 AND COALESCE(pi.longitude, p.longitude) IS NOT NULL AND COALESCE(pi.longitude, p.longitude) != 0) OR " +
+           "    (:isLocationValid = false AND (COALESCE(pi.latitude, p.latitude) IS NULL OR COALESCE(pi.latitude, p.latitude) = 0 OR COALESCE(pi.longitude, p.longitude) IS NULL OR COALESCE(pi.longitude, p.longitude) = 0))) " +
            "AND (:zoneId IS NULL OR " +
-           "    (:zoneId = 'none' AND p.id_zone IS NULL) OR " +
-           "    (:zoneId IS NOT NULL AND :zoneId != 'none' AND CAST(p.id_zone AS VARCHAR) = :zoneId)) " +
+           "    (:zoneId = 'none' AND pi.id_zone IS NULL) OR " +
+           "    (:zoneId IS NOT NULL AND :zoneId != 'none' AND CAST(pi.id_zone AS VARCHAR) = :zoneId)) " +
            "AND (:hasOrdered IS NULL OR " +
-           "    (:hasOrdered = true AND (p.never_ordered IS NULL OR p.never_ordered = false)) OR " +
-           "    (:hasOrdered = false AND p.never_ordered = true))" +
+           "    (:hasOrdered = true AND (pi.never_ordered IS NULL OR pi.never_ordered = false)) OR " +
+           "    (:hasOrdered = false AND pi.never_ordered = true))" +
            " ORDER BY p.cip LIMIT :maxResults",
            nativeQuery = true)
     List<Pharmacy> searchPharmaciesByAccount(

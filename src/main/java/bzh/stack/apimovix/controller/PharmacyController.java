@@ -85,7 +85,8 @@ public class PharmacyController {
     })
     public ResponseEntity<?> getPharmacyAdmin(
             @Parameter(description = "CIP code of the pharmacy to retrieve", required = true) @PathVariable String cip) {
-        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip);
+        // Admin can access all pictures, pass null for accountId
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacy(cip, null);
         if (pharmacy.isEmpty()) {
             return MAPIR.notFound();
         }
@@ -125,7 +126,7 @@ public class PharmacyController {
             return MAPIR.notFound();
         }
 
-        PharmacyPicture picture = pharmacyService.createPharmacyPicture(pharmacy.get(), body.getBase64());
+        PharmacyPicture picture = pharmacyService.createPharmacyPicture(pharmacy.get(), profil.getAccount(), body.getBase64());
 
         if (picture == null) {
             return MAPIR.internalServerError();
@@ -151,7 +152,7 @@ public class PharmacyController {
         }
 
         UUID uuid = UUID.fromString(id);
-        Boolean deleted = pharmacyService.deletePharmacyPhoto(pharmacy.get(), uuid);
+        Boolean deleted = pharmacyService.deletePharmacyPhoto(pharmacy.get(), profil.getAccount(), uuid);
 
         if (deleted) {
             return MAPIR.deleted();
@@ -235,7 +236,8 @@ public class PharmacyController {
     public ResponseEntity<?> deletePharmacy(
             @Parameter(description = "CIP code of the pharmacy to delete", required = true) @PathVariable String cip) {
         try {
-            boolean deleted = pharmacyService.deletePharmacy(cip);
+            // HyperAdmin can delete all pictures from all accounts, so pass null
+            boolean deleted = pharmacyService.deletePharmacy(cip, null);
             if (!deleted) {
                 return MAPIR.notFound();
             }
@@ -278,7 +280,7 @@ public class PharmacyController {
         }
 
         try {
-            byte[] pdfBytes = pdfGeneratorService.generatePharmacyLabel(pharmacy.get());
+            byte[] pdfBytes = pdfGeneratorService.generatePharmacyLabel(pharmacy.get(), profil.getAccount());
             return MAPIR.pdf(pdfBytes, "pharmacy-label-" + cip + ".pdf");
         } catch (IOException e) {
             return MAPIR.internalServerError();

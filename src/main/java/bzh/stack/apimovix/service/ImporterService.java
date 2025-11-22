@@ -18,6 +18,7 @@ import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Pharmacy;
+import bzh.stack.apimovix.model.PharmacyInformations;
 import bzh.stack.apimovix.model.Sender;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.repository.tour.TourRepository;
@@ -86,11 +87,20 @@ public class ImporterService {
         Optional<Command> optCommand = commandService.findPharmacyCommandByDate(sender.getAccount(), pharmacy.getCip(), body.getExpedition_date());
 
         if (optCommand.isEmpty()) {
-            Boolean newPharmacy = pharmacy.getNeverOrdered();
-            if (pharmacy.getNeverOrdered()) {
-                pharmacy.setNeverOrdered(false);
-                pharmacy = pharmacyService.save(pharmacy);
-            }
+            // Charger le PharmacyInformations pour ce compte
+            pharmacy.loadPharmacyInformationsForAccount(sender.getAccount().getId());
+
+            // Obtenir ou créer le PharmacyInformations pour ce compte
+            PharmacyInformations pharmacyInfo = pharmacy.getOrCreatePharmacyInformationsForAccount(sender.getAccount());
+
+            // Vérifier si c'est la première commande pour ce compte (neverOrdered est true par défaut)
+            Boolean newPharmacy = pharmacyInfo.getNeverOrdered();
+
+            // Marquer comme non nouvelle pharmacie maintenant qu'une commande est créée
+            pharmacyInfo.setNeverOrdered(false);
+            pharmacy.setPharmacyInformations(pharmacyInfo);
+            pharmacy = pharmacyService.save(pharmacy);
+
             return commandService.createCommand(pharmacy, sender, null, body.getCommand(),
                 body.getExpedition_date(), newPharmacy);
         }

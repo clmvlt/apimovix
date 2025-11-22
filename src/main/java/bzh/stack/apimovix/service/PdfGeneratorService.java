@@ -38,6 +38,7 @@ import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Image;
 
+import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.PackageEntity;
@@ -60,15 +61,92 @@ public class PdfGeneratorService {
     private static final float LABEL_WIDTH = 295;
     private static final float LABEL_HEIGHT = 421;
 
-    public void drawLogo(Document document) throws IOException {
-        File file = pictureService.findImageFile("logos/logo.png");
-        byte[] imageBytes = java.nio.file.Files.readAllBytes(file.toPath());
-        Image logo = new Image(ImageDataFactory.create(imageBytes));
-        logo.scale(0.2f, 0.2f);
-        float x = document.getPdfDocument().getDefaultPageSize().getWidth() - logo.getImageScaledWidth() - 15;
-        float y = document.getPdfDocument().getDefaultPageSize().getHeight() - logo.getImageScaledHeight() - 15;
-        logo.setFixedPosition(x, y);
-        document.add(logo);
+    /**
+     * Convertit une image en noir et blanc (niveaux de gris) en préservant la transparence
+     */
+    private byte[] convertToGrayscale(byte[] imageBytes) throws IOException {
+        BufferedImage originalImage = ImageIO.read(new java.io.ByteArrayInputStream(imageBytes));
+
+        // Vérifier si l'image a de la transparence
+        boolean hasAlpha = originalImage.getColorModel().hasAlpha();
+
+        BufferedImage grayscaleImage;
+        if (hasAlpha) {
+            // Utiliser TYPE_BYTE_GRAY avec canal alpha pour préserver la transparence
+            grayscaleImage = new BufferedImage(
+                originalImage.getWidth(),
+                originalImage.getHeight(),
+                BufferedImage.TYPE_INT_ARGB
+            );
+
+            // Convertir en niveaux de gris pixel par pixel en préservant l'alpha
+            for (int y = 0; y < originalImage.getHeight(); y++) {
+                for (int x = 0; x < originalImage.getWidth(); x++) {
+                    int rgb = originalImage.getRGB(x, y);
+                    int alpha = (rgb >> 24) & 0xFF;
+                    int red = (rgb >> 16) & 0xFF;
+                    int green = (rgb >> 8) & 0xFF;
+                    int blue = rgb & 0xFF;
+
+                    // Formule de luminance pour conversion en niveaux de gris
+                    int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
+
+                    // Reconstruire le pixel avec le niveau de gris et l'alpha original
+                    int grayRgb = (alpha << 24) | (gray << 16) | (gray << 8) | gray;
+                    grayscaleImage.setRGB(x, y, grayRgb);
+                }
+            }
+        } else {
+            // Pas de transparence, conversion simple
+            grayscaleImage = new BufferedImage(
+                originalImage.getWidth(),
+                originalImage.getHeight(),
+                BufferedImage.TYPE_BYTE_GRAY
+            );
+
+            java.awt.Graphics2D g2d = grayscaleImage.createGraphics();
+            g2d.drawImage(originalImage, 0, 0, null);
+            g2d.dispose();
+        }
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(grayscaleImage, "png", baos);
+        return baos.toByteArray();
+    }
+
+    public void drawLogo(Document document, Account account) throws IOException {
+        // Ne dessiner le logo que si le compte a un logo défini
+        if (account == null || account.getLogo() == null) {
+            return;
+        }
+
+        File file = pictureService.findImageFile(account.getLogo().getName());
+
+        if (file != null && file.exists()) {
+            byte[] imageBytes = java.nio.file.Files.readAllBytes(file.toPath());
+            // Convertir l'image en noir et blanc
+            byte[] grayscaleBytes = convertToGrayscale(imageBytes);
+            Image logo = new Image(ImageDataFactory.create(grayscaleBytes));
+
+            // Forcer la hauteur à exactement 30px en gardant le ratio
+            float targetHeight = 40;
+            float ratio = logo.getImageWidth() / logo.getImageHeight();
+            float targetWidth = targetHeight * ratio;
+            logo.scaleAbsolute(targetWidth, targetHeight);
+
+            // Positionner le logo en haut à droite avec une marge de 20px
+            float pageWidth = document.getPdfDocument().getDefaultPageSize().getWidth();
+            float pageHeight = document.getPdfDocument().getDefaultPageSize().getHeight();
+            float margin = 15;
+
+            // setFixedPosition positionne le coin inférieur gauche de l'image
+            // Pour avoir le coin supérieur droit du logo à 20px du coin supérieur droit de la page :
+            float x = pageWidth - targetWidth - margin;
+            float y = pageHeight - targetHeight - margin;
+
+            logo.setFixedPosition(x, y);
+            document.add(logo);
+        }
     }
 
     private void drawPackageBarcode(Document document, PackageEntity packageEntity, PdfFont font) throws IOException {
@@ -332,10 +410,19 @@ public class PdfGeneratorService {
         Document document = new Document(pdf, new PageSize(LABEL_WIDTH, LABEL_HEIGHT));
         document.setMargins(0, 0, 0, 0);
 
+        // Ajouter explicitement la première page
+        pdf.addNewPage();
+
         PdfFont font = PdfFontFactory.createFont(StandardFonts.COURIER);
         PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.COURIER_BOLD);
 
-        drawLogo(document);
+        // Récupérer le compte depuis le tour de la commande
+        Account account = null;
+        if (packageEntity.getCommand() != null && packageEntity.getCommand().getTour() != null) {
+            account = packageEntity.getCommand().getTour().getAccount();
+        }
+
+        drawLogo(document, account);
         drawPackageBarcode(document, packageEntity, font);
 
         drawSquare(document, 10, 10, 10, 80);
@@ -368,7 +455,8 @@ public class PdfGeneratorService {
         String numTransport = packageEntity.getCNumTransport() == null ? "Aucun" : packageEntity.getCNumTransport();
         drawText(document, 15, 242, LABEL_WIDTH - 85, 28, "N° prepa : " + numTransport, false, null, false,
                 12, font, fontBold);
-        drawText(document, 15, 270, LABEL_WIDTH - 85, 28, "Transport : AVTrans Concept", false, null, false, 12, font,
+        String transportName = account != null && account.getSociete() != null ? account.getSociete() : "";
+        drawText(document, 15, 270, LABEL_WIDTH - 85, 28, "Transport : " + transportName, false, null, false, 12, font,
                 fontBold);
 
         drawText(document, 10, 302, LABEL_WIDTH - 80, 20, "Imprimé le " + LocalDateTime.now(ZoneId.of("Europe/Paris"))
@@ -424,10 +512,13 @@ public class PdfGeneratorService {
         drawFullTextInZone(document, x + 5, y + 32,
                 document.getPdfDocument().getDefaultPageSize().getWidth() - (x + 5) * 2 - qrWidth, 12,
                 command.getPharmacy().getFullCity(), false, null, false, font, fontBold);
-        drawText(document, x + 5, y + 46,
-                document.getPdfDocument().getDefaultPageSize().getWidth() - (x + 5) * 2 - qrWidth, 50,
-                "Informations : " + command.getPharmacy().getInformations().strip(), false, null, false, 10, font,
-                fontBold);
+        String informations = command.getPharmacy().getInformations();
+        if (informations != null && !informations.isEmpty()) {
+            drawText(document, x + 5, y + 46,
+                    document.getPdfDocument().getDefaultPageSize().getWidth() - (x + 5) * 2 - qrWidth, 50,
+                    "Informations : " + informations.strip(), false, null, false, 10, font,
+                    fontBold);
+        }
 
         double totalWeight = command.getPackages().stream()
                 .mapToDouble(pkg -> pkg.getWeight() != null ? pkg.getWeight() : 0.0)
@@ -981,10 +1072,11 @@ public class PdfGeneratorService {
      * Format adapté pour imprimante d'étiquettes (62x100mm)
      *
      * @param pharmacy La pharmacie pour laquelle générer le label
+     * @param account Le compte dont on veut utiliser le logo (optionnel, utilise le logo par défaut si null)
      * @return Les octets du PDF généré
      * @throws IOException En cas d'erreur lors de la génération
      */
-    public byte[] generatePharmacyLabel(Pharmacy pharmacy) throws IOException {
+    public byte[] generatePharmacyLabel(Pharmacy pharmacy, Account account) throws IOException {
         // Format A4
         float pageHeight = PageSize.A4.getHeight(); // 842 points
 
@@ -1009,22 +1101,42 @@ public class PdfGeneratorService {
         float margin = 5;
         float yPosition = labelHeight;
 
-        // Section 1: Logo centré en haut du label
+        // Section 1: Logo centré en haut du label (seulement si le compte a un logo)
         float logoSectionHeight = 40;
         try {
-            File logoFile = pictureService.findImageFile("logos/logo.png");
-            if (logoFile != null && logoFile.exists()) {
-                byte[] imageBytes = java.nio.file.Files.readAllBytes(logoFile.toPath());
-                Image logo = new Image(ImageDataFactory.create(imageBytes));
+            // Ne dessiner le logo que si le compte a un logo défini
+            if (account != null && account.getLogo() != null) {
+                File logoFile = pictureService.findImageFile(account.getLogo().getName());
 
-                // Limiter la taille du logo adapté au nouveau format
-                logo.scaleToFit(140, 35);
+                if (logoFile != null && logoFile.exists()) {
+                byte[] imageBytes = java.nio.file.Files.readAllBytes(logoFile.toPath());
+                // Convertir l'image en noir et blanc
+                byte[] grayscaleBytes = convertToGrayscale(imageBytes);
+                Image logo = new Image(ImageDataFactory.create(grayscaleBytes));
+
+                // Limiter la hauteur à 30px maximum en gardant le ratio
+                logo.setAutoScale(true);
+                logo.scaleToFit(140, 30);
+
+                System.out.println("=== DEBUG PHARMACY LABEL LOGO ===");
+                System.out.println("Label width: " + labelWidth);
+                System.out.println("Label height: " + labelHeight);
+                System.out.println("Label start X: " + labelStartX);
+                System.out.println("Label start Y: " + labelStartY);
+                System.out.println("Image scaled width: " + logo.getImageScaledWidth());
+                System.out.println("Image scaled height: " + logo.getImageScaledHeight());
 
                 // Centrer horizontalement dans le label, positionné en haut à gauche de la page A4
                 float logoX = labelStartX + (labelWidth - logo.getImageScaledWidth()) / 2;
                 float logoY = labelStartY + labelHeight - logo.getImageScaledHeight() - 3;
+
+                System.out.println("Logo X position: " + logoX);
+                System.out.println("Logo Y position: " + logoY);
+                System.out.println("=================================");
+
                 logo.setFixedPosition(logoX, logoY);
                 document.add(logo);
+                }
             }
         } catch (Exception e) {
             // Si le logo ne peut pas être chargé, on continue sans

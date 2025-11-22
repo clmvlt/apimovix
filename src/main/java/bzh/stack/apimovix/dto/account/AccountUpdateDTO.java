@@ -7,9 +7,15 @@ public class AccountUpdateDTO {
     private String societe;
     
     private String address1;
-    
+
     private String address2;
-    
+
+    private String postalCode;
+
+    private String city;
+
+    private String country;
+
     private Double latitude;
     
     private Double longitude;
@@ -34,5 +40,8 @@ public class AccountUpdateDTO {
     private Boolean autoSendAnomalieEmails;
 
     private Boolean autoCreateTour;
+
+    // Logo en base64
+    private String logo;
 
 } 

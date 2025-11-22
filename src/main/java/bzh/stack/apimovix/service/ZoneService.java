@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.Zone;
+import bzh.stack.apimovix.repository.PharmacyInformationsRepository;
 import bzh.stack.apimovix.repository.ZoneRepository;
 import bzh.stack.apimovix.service.pharmacy.PharmacyService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class ZoneService {
     private final ZoneRepository zoneRepository;
     private final PharmacyService pharmacyService;
+    private final PharmacyInformationsRepository pharmacyInformationsRepository;
 
     @Transactional
     public Zone createZone(Account account, String name) {
@@ -42,9 +44,11 @@ public class ZoneService {
 
     @Transactional
     public boolean unassignPharmacy(Account account, String cip) {
-        return pharmacyService.findPharmacy(cip)
+        return pharmacyService.findPharmacy(cip, account.getId())
             .map(pharmacy -> {
-                pharmacy.setZone(null);
+                if (pharmacy.getPharmacyInformations() != null) {
+                    pharmacy.getPharmacyInformations().setZone(null);
+                }
                 pharmacyService.save(pharmacy);
                 return true;
             })
@@ -58,9 +62,11 @@ public class ZoneService {
             return false;
         }
 
-        return pharmacyService.findPharmacy(cip)
+        return pharmacyService.findPharmacy(cip, account.getId())
             .map(pharmacy -> {
-                pharmacy.setZone(optZone.get());
+                if (pharmacy.getPharmacyInformations() != null) {
+                    pharmacy.getPharmacyInformations().setZone(optZone.get());
+                }
                 pharmacyService.save(pharmacy);
                 return true;
             })
@@ -70,7 +76,7 @@ public class ZoneService {
     @Transactional
     public boolean unassignPharmacies(Account account, List<String> cips) {
         List<Pharmacy> pharmacies = cips.stream()
-            .map(pharmacyService::findPharmacy)
+            .map(cip -> pharmacyService.findPharmacy(cip, account.getId()))
             .filter(Optional::isPresent)
             .map(Optional::get)
             .collect(Collectors.toList());
@@ -80,7 +86,9 @@ public class ZoneService {
         }
 
         pharmacies.forEach(pharmacy -> {
-            pharmacy.setZone(null);
+            if (pharmacy.getPharmacyInformations() != null) {
+                pharmacy.getPharmacyInformations().setZone(null);
+            }
             pharmacyService.save(pharmacy);
         });
 
@@ -96,7 +104,7 @@ public class ZoneService {
 
         Zone zone = optZone.get();
         List<Pharmacy> pharmacies = cips.stream()
-            .map(pharmacyService::findPharmacy)
+            .map(cip -> pharmacyService.findPharmacy(cip, account.getId()))
             .filter(Optional::isPresent)
             .map(Optional::get)
             .collect(Collectors.toList());
@@ -106,7 +114,9 @@ public class ZoneService {
         }
 
         pharmacies.forEach(pharmacy -> {
-            pharmacy.setZone(zone);
+            if (pharmacy.getPharmacyInformations() != null) {
+                pharmacy.getPharmacyInformations().setZone(zone);
+            }
             pharmacyService.save(pharmacy);
         });
 
@@ -121,5 +131,10 @@ public class ZoneService {
     @Transactional(readOnly = true)
     public List<Zone> findZones(Account account) {
         return zoneRepository.findZones(account);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Pharmacy> findPharmaciesByZone(Account account, UUID zoneId) {
+        return pharmacyInformationsRepository.findPharmaciesByZoneId(zoneId, account.getId());
     }
 } 

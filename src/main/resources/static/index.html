@@ -106,6 +106,7 @@
                     <span id="db-status">En attente...</span>
                     <span class="status-indicator" id="db-status-indicator"></span>
                 </div>
+                <small class="text-muted d-block" id="db-url"></small>
                 <small class="text-muted" id="db-version"></small>
             </div>
 
@@ -162,6 +163,7 @@
                         dbStatus.textContent = 'Déconnecté';
                         dbIndicator.className = 'status-indicator status-offline';
                     }
+                    document.getElementById('db-url').textContent = `URL: ${data.databaseUrl}`;
                     document.getElementById('db-version').textContent = `Version: ${data.dbVersion}`;
 
                     // Mise à jour Informations système

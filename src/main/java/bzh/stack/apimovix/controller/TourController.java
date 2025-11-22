@@ -343,7 +343,7 @@ public class TourController {
             HttpServletRequest request,
             @Parameter(description = "ID of the tour to generate PDF for", required = true) @PathVariable String id) {
         Profil profil = (Profil) request.getAttribute("profil");
-        Optional<Tour> tour = tourService.findTour(profil.getAccount(), id);
+        Optional<Tour> tour = tourService.findTourForTarif(profil.getAccount(), id);
         if (tour.isEmpty()) {
             return MAPIR.notFound();
         }

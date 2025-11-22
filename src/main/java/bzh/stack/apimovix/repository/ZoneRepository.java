@@ -14,9 +14,9 @@ import bzh.stack.apimovix.model.Zone;
 
 @Repository
 public interface ZoneRepository extends JpaRepository<Zone, UUID> {
-    @Query("SELECT DISTINCT z FROM Zone z LEFT JOIN FETCH z.pharmacies WHERE z.id = :id AND z.account = :account")
+    @Query("SELECT z FROM Zone z WHERE z.id = :id AND z.account = :account")
     public Optional<Zone> findZone(@Param("account") Account account, @Param("id") UUID id);
-    @Query("SELECT DISTINCT z FROM Zone z LEFT JOIN FETCH z.pharmacies WHERE z.id = :id")
+    @Query("SELECT z FROM Zone z WHERE z.id = :id")
     public Optional<Zone> findZone(@Param("id") UUID id);
 
     @Query("SELECT DISTINCT z FROM Zone z WHERE z.account = :account ORDER BY z.name")

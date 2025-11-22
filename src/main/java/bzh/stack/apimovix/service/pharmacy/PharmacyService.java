@@ -11,12 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 import bzh.stack.apimovix.dto.pharmacy.PharmacyCreateDTO;
 import bzh.stack.apimovix.dto.pharmacy.PharmacySearchDTO;
 import bzh.stack.apimovix.dto.pharmacy.PharmacyUpdateDTO;
-import bzh.stack.apimovix.mapper.PharmacyMapper;
+import bzh.stack.apimovix.mapper.PharmacyInformationsMapper;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInfos;
+import bzh.stack.apimovix.model.PharmacyInformations;
 import bzh.stack.apimovix.model.Zone;
 import bzh.stack.apimovix.model.Picture.PharmacyInfosPicture;
 import bzh.stack.apimovix.model.Picture.PharmacyPicture;
@@ -35,7 +36,7 @@ import jakarta.validation.Valid;
 @Service
 public class PharmacyService {
 
-    private final PharmacyMapper pharmacyMapper;
+    private final PharmacyInformationsMapper pharmacyInformationsMapper;
 
     private final PharmacyRepository pharmacyRepository;
     private final PharmacyPictureRepository pharmacyPictureRepository;
@@ -55,7 +56,7 @@ public class PharmacyService {
             CommandRepository commandRepository,
             AnomalieRepository anomalieRepository,
             PictureService pictureService,
-            PharmacyMapper pharmacyMapper,
+            PharmacyInformationsMapper pharmacyInformationsMapper,
             ZoneRepository zoneRepository,
             AccountRepository accountRepository) {
         this.pharmacyRepository = pharmacyRepository;
@@ -65,30 +66,60 @@ public class PharmacyService {
         this.commandRepository = commandRepository;
         this.anomalieRepository = anomalieRepository;
         this.pictureService = pictureService;
-        this.pharmacyMapper = pharmacyMapper;
+        this.pharmacyInformationsMapper = pharmacyInformationsMapper;
         this.zoneRepository = zoneRepository;
         this.accountRepository = accountRepository;
     }
 
 
     @Transactional(readOnly = true)
-    public List<Pharmacy> findPharmacies() {
-        return pharmacyRepository.findPharmacies();
+    public List<Pharmacy> findPharmacies(UUID accountId) {
+        List<Pharmacy> pharmacies = pharmacyRepository.findPharmacies(accountId);
+        // Filter pictures by account
+        filterPicturesByAccount(pharmacies, accountId);
+        return pharmacies;
     }
 
     @Transactional(readOnly = true)
     public List<Pharmacy> findPharmaciesByAccount(Account account) {
-        return pharmacyRepository.findPharmaciesByAccount(account.getId());
+        List<Pharmacy> pharmacies = pharmacyRepository.findPharmaciesByAccount(account.getId());
+        // Filter pictures by account
+        filterPicturesByAccount(pharmacies, account.getId());
+        // Charger le bon PharmacyInformations pour chaque pharmacie
+        pharmacies.forEach(p -> p.loadPharmacyInformationsForAccount(account.getId()));
+        return pharmacies;
     }
 
     @Transactional(readOnly = true)
-    public Optional<Pharmacy> findPharmacy(String cip) {
-        return Optional.ofNullable(pharmacyRepository.findPharmacy(cip));
+    public Optional<Pharmacy> findPharmacy(String cip, UUID accountId) {
+        Pharmacy pharmacy = pharmacyRepository.findPharmacy(cip, accountId);
+        if (pharmacy != null) {
+            filterPicturesByAccount(pharmacy, accountId);
+        }
+        return Optional.ofNullable(pharmacy);
     }
 
     @Transactional(readOnly = true)
     public Optional<Pharmacy> findPharmacyByAccount(Account account, String cip) {
-        return Optional.ofNullable(pharmacyRepository.findPharmacyByAccount(cip, account.getId()));
+        Pharmacy pharmacy = pharmacyRepository.findPharmacyByAccount(cip, account.getId());
+        if (pharmacy != null) {
+            filterPicturesByAccount(pharmacy, account.getId());
+        }
+        return Optional.ofNullable(pharmacy);
+    }
+
+    private void filterPicturesByAccount(Pharmacy pharmacy, UUID accountId) {
+        if (accountId == null) {
+            // No accountId provided, clear all pictures
+            pharmacy.getPictures().clear();
+        } else {
+            // Filter pictures to keep only those matching the accountId
+            pharmacy.getPictures().removeIf(pic -> pic.getAccount() == null || !pic.getAccount().getId().equals(accountId));
+        }
+    }
+
+    private void filterPicturesByAccount(List<Pharmacy> pharmacies, UUID accountId) {
+        pharmacies.forEach(p -> filterPicturesByAccount(p, accountId));
     }
 
     @Transactional(readOnly = true)
@@ -174,17 +205,28 @@ public class PharmacyService {
             maxResults = 200; // Default value
         }
 
-        return pharmacyRepository.searchPharmacies(
+        // Recherche en deux étapes : d'abord les CIPs, puis les entités complètes
+        List<String> cips = pharmacyRepository.searchPharmaciesCips(
                 name,
                 city,
-                cityAlias,
                 pharmacySearchDTO.getPostalCode(),
                 pharmacySearchDTO.getCip(),
                 address,
                 pharmacySearchDTO.getIsLocationValid(),
-                maxResults,
-                pharmacySearchDTO.getZoneId(),
-                pharmacySearchDTO.getHasOrdered());
+                maxResults);
+
+        if (cips.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        // Fetch pharmacies (repository method handles pictures and informations)
+        List<Pharmacy> pharmacies = pharmacyRepository.findPharmaciesByCips(cips, null);
+
+        // Filter pictures - no account, so clear all pictures
+        filterPicturesByAccount(pharmacies, null);
+
+        // Note: searchPharmacies is called without account context, so pharmacyInformations stays null
+        return pharmacies;
     }
 
     @Transactional(readOnly = true)
@@ -265,7 +307,8 @@ public class PharmacyService {
             maxResults = 200; // Default value
         }
 
-        return pharmacyRepository.searchPharmaciesByAccount(
+        // Utiliser la requête native qui supporte tous les filtres (zoneId, hasOrdered)
+        List<Pharmacy> pharmacies = pharmacyRepository.searchPharmaciesByAccount(
                 account.getId().toString(),
                 name,
                 city,
@@ -277,10 +320,21 @@ public class PharmacyService {
                 maxResults,
                 pharmacySearchDTO.getZoneId(),
                 pharmacySearchDTO.getHasOrdered());
+
+        if (pharmacies.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        // Filter pictures by account
+        filterPicturesByAccount(pharmacies, account.getId());
+
+        // Charger le bon PharmacyInformations pour chaque pharmacie en fonction du compte
+        pharmacies.forEach(p -> p.loadPharmacyInformationsForAccount(account.getId()));
+        return pharmacies;
     }
 
     @Transactional
-    public PharmacyPicture createPharmacyPicture(Pharmacy pharmacy, String base64Image) {
+    public PharmacyPicture createPharmacyPicture(Pharmacy pharmacy, Account account, String base64Image) {
         String fileName = pictureService.savePharmacyImage(pharmacy, base64Image);
         PharmacyPicture picture = null;
 
@@ -289,6 +343,7 @@ public class PharmacyService {
                 picture = new PharmacyPicture();
                 picture.setName(fileName);
                 picture.setPharmacy(pharmacy);
+                picture.setAccount(account);
                 pharmacyPictureRepository.save(picture);
 
                 pharmacy.getPictures().add(picture);
@@ -302,11 +357,9 @@ public class PharmacyService {
     }
 
     @Transactional
-    public boolean deletePharmacyPhoto(Pharmacy pharmacy, UUID photoId) {
-        PharmacyPicture pictureToDelete = pharmacy.getPictures().stream()
-                .filter(p -> p.getId().equals(photoId))
-                .findFirst()
-                .orElse(null);
+    public boolean deletePharmacyPhoto(Pharmacy pharmacy, Account account, UUID photoId) {
+        // Use repository method to ensure we only delete pictures belonging to this account
+        PharmacyPicture pictureToDelete = pharmacyPictureRepository.findPicture(pharmacy.getCip(), photoId, account.getId());
 
         if (pictureToDelete == null) {
             return false;
@@ -330,33 +383,85 @@ public class PharmacyService {
     public Pharmacy createPharmacy(Account account, @Valid PharmacyCreateDTO pharmacyDTO) {
         // Vérifier l'existence uniquement par CIP, sans tenir compte de l'account
         Optional<Pharmacy> optPharmacy = findPharmacyByCipOnly(pharmacyDTO.getCip());
+
+        Pharmacy pharmacy;
         if (optPharmacy.isPresent()) {
-            return optPharmacy.get();
-        }
-        Pharmacy pharmacy = new Pharmacy();
-        Optional<Zone> zoneOptional = zoneRepository.findZone(pharmacyDTO.getZoneId());
-        if (zoneOptional.isPresent()) {
-            pharmacy.setZone(zoneOptional.get());
+            pharmacy = optPharmacy.get();
+        } else {
+            // Créer une nouvelle pharmacie avec les données de base (données communes à tous les comptes)
+            pharmacy = new Pharmacy();
+            pharmacy.setCip(pharmacyDTO.getCip());
+            pharmacy.setName(pharmacyDTO.getName());
+
+            // Remplir les champs de base dans la table pharmacy (données partagées entre tous les comptes)
+            pharmacy.setAddress1(pharmacyDTO.getAddress1());
+            pharmacy.setAddress2(pharmacyDTO.getAddress2());
+            pharmacy.setAddress3(pharmacyDTO.getAddress3());
+            pharmacy.setPostalCode(pharmacyDTO.getPostal_code());
+            pharmacy.setCity(pharmacyDTO.getCity());
+            pharmacy.setCountry(pharmacyDTO.getCountry());
+            pharmacy.setPhone(pharmacyDTO.getPhone());
+            pharmacy.setFax(pharmacyDTO.getFax());
+            pharmacy.setEmail(pharmacyDTO.getEmail());
+            pharmacy.setLatitude(pharmacyDTO.getLatitude());
+            pharmacy.setLongitude(pharmacyDTO.getLongitude());
+            pharmacy.setQuality(pharmacyDTO.getQuality());
+            pharmacy.setFirstName(pharmacyDTO.getFirst_name());
+            pharmacy.setLastName(pharmacyDTO.getLast_name());
         }
 
-        // Assigner automatiquement l'account de l'utilisateur qui crée la pharmacie
-        pharmacy.setAccount(account);
+        // Si un account est fourni, créer le PharmacyInformations pour ce compte
+        if (account != null) {
+            // Obtenir ou créer le PharmacyInformations pour ce compte
+            PharmacyInformations pharmacyInformations = pharmacy.getOrCreatePharmacyInformationsForAccount(account);
 
-        if (pharmacyDTO != null) {
-            pharmacy.mapFromDTO(pharmacyDTO);
+            // Remplir les données spécifiques au compte (peuvent override les données de pharmacy)
+            pharmacyInformations.setAddress1(pharmacyDTO.getAddress1());
+            pharmacyInformations.setAddress2(pharmacyDTO.getAddress2());
+            pharmacyInformations.setAddress3(pharmacyDTO.getAddress3());
+            pharmacyInformations.setPostalCode(pharmacyDTO.getPostal_code());
+            pharmacyInformations.setCity(pharmacyDTO.getCity());
+            pharmacyInformations.setCountry(pharmacyDTO.getCountry());
+            pharmacyInformations.setInformations(pharmacyDTO.getInformations());
+            pharmacyInformations.setPhone(pharmacyDTO.getPhone());
+            pharmacyInformations.setFax(pharmacyDTO.getFax());
+            pharmacyInformations.setEmail(pharmacyDTO.getEmail());
+            pharmacyInformations.setLatitude(pharmacyDTO.getLatitude());
+            pharmacyInformations.setLongitude(pharmacyDTO.getLongitude());
+            pharmacyInformations.setQuality(pharmacyDTO.getQuality());
+            pharmacyInformations.setFirstName(pharmacyDTO.getFirst_name());
+            pharmacyInformations.setLastName(pharmacyDTO.getLast_name());
+            pharmacyInformations.setCommentaire(pharmacyDTO.getCommentaire());
+            pharmacyInformations.setNeverOrdered(true);
+
+            // Associer la zone si elle existe
+            if (pharmacyDTO.getZoneId() != null) {
+                Optional<Zone> zoneOptional = zoneRepository.findZone(pharmacyDTO.getZoneId());
+                if (zoneOptional.isPresent()) {
+                    pharmacyInformations.setZone(zoneOptional.get());
+                }
+            }
+
+            pharmacy.setPharmacyInformations(pharmacyInformations);
         }
-        pharmacy.setNeverOrdered(true);
+
         return pharmacyRepository.save(pharmacy);
     }
 
     @Transactional
     public Optional<Pharmacy> updatePharmacy(Account account, @Valid PharmacyUpdateDTO pharmacyUpdateDTO, String cip) {
-        Optional<Pharmacy> optPharmacy = findPharmacy(cip);
+        Optional<Pharmacy> optPharmacy = findPharmacy(cip, account.getId());
         if (optPharmacy.isEmpty()) {
             return Optional.empty();
         }
         Pharmacy pharmacy = optPharmacy.get();
-        pharmacyMapper.updateEntityFromDto(pharmacyUpdateDTO, pharmacy);
+
+        // Obtenir ou créer le PharmacyInformations pour ce compte
+        PharmacyInformations pharmacyInformations = pharmacy.getOrCreatePharmacyInformationsForAccount(account);
+        pharmacy.setPharmacyInformations(pharmacyInformations);
+
+        // Mettre à jour uniquement le PharmacyInformations, PAS la table Pharmacy
+        pharmacyInformationsMapper.updateFromDto(pharmacyUpdateDTO, pharmacyInformations);
 
         // Gérer la zone uniquement si le champ zoneId était présent dans la requête
         if (pharmacyUpdateDTO.isZoneIdWasSet()) {
@@ -364,14 +469,14 @@ public class PharmacyService {
 
             if (zoneIdStr == null || zoneIdStr.trim().isEmpty()) {
                 // Si zoneId est null ou vide, supprimer la zone
-                pharmacy.setZone(null);
+                pharmacy.getPharmacyInformations().setZone(null);
             } else {
                 // Sinon, assigner une nouvelle zone
                 try {
                     UUID zoneId = UUID.fromString(zoneIdStr);
                     Optional<Zone> zoneOptional = zoneRepository.findZone(account, zoneId);
                     if (zoneOptional.isPresent()) {
-                        pharmacy.setZone(zoneOptional.get());
+                        pharmacy.getPharmacyInformations().setZone(zoneOptional.get());
                     }
                 } catch (IllegalArgumentException e) {
                     // UUID invalide, on ignore
@@ -391,7 +496,7 @@ public class PharmacyService {
                     UUID accountId = UUID.fromString(accountIdStr);
                     Optional<Account> accountOptional = accountRepository.findById(accountId);
                     if (accountOptional.isPresent()) {
-                        pharmacy.setAccount(accountOptional.get());
+                        pharmacy.getPharmacyInformations().setAccount(accountOptional.get());
                     }
                 } catch (IllegalArgumentException e) {
                     // UUID invalide, on ignore
@@ -404,8 +509,8 @@ public class PharmacyService {
     }
 
     @Transactional
-    public boolean deletePharmacy(String cip) {
-        Optional<Pharmacy> optPharmacy = findPharmacy(cip);
+    public boolean deletePharmacy(String cip, UUID accountId) {
+        Optional<Pharmacy> optPharmacy = findPharmacy(cip, accountId);
         if (optPharmacy.isEmpty()) {
             return false;
         }
@@ -459,7 +564,7 @@ public class PharmacyService {
     }
 
     @Transactional
-    public PharmacyPicture copyPharmacyInfosPictureToPharmacy(Pharmacy pharmacy, UUID pharmacyInfosPictureId) {
+    public PharmacyPicture copyPharmacyInfosPictureToPharmacy(Pharmacy pharmacy, UUID pharmacyInfosPictureId, Account account) {
         Optional<PharmacyInfosPicture> optPharmacyInfosPicture = pharmacyInfosPictureRepository.findById(pharmacyInfosPictureId);
         if (optPharmacyInfosPicture.isEmpty()) {
             return null;
@@ -483,6 +588,7 @@ public class PharmacyService {
             PharmacyPicture picture = new PharmacyPicture();
             picture.setName(newFileName);
             picture.setPharmacy(pharmacy);
+            picture.setAccount(account);
             pharmacyPictureRepository.save(picture);
 
             pharmacy.getPictures().add(picture);

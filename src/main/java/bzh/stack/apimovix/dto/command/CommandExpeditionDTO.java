@@ -31,18 +31,18 @@ public class CommandExpeditionDTO {
     private CommandStatusDTO status;
 
     public CommandExpeditionDTO(
-        UUID id, 
-        LocalDateTime closeDate, 
-        Integer tourOrder, 
-        LocalDateTime expDate, 
-        String comment, 
+        UUID id,
+        LocalDateTime closeDate,
+        Integer tourOrder,
+        LocalDateTime expDate,
+        String comment,
         Boolean newPharmacy,
-        Double latitude, 
-        Double longitude, 
+        Double latitude,
+        Double longitude,
         Tour tour,
-        Long packagesNumber, 
-        Float totalWeight, 
-        PharmacyDTO pharmacy, 
+        Long packagesNumber,
+        Double totalWeight,
+        PharmacyDTO pharmacy,
         CommandStatus status
     ) {
         this.id = id;

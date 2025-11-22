@@ -33,6 +33,14 @@ public interface TourRepository extends JpaRepository<Tour, String> {
     @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.id = :id AND t.account = :account ORDER BY t.name, c.tourOrder")
     Tour findTour(@Param("account") Account account, @Param("id") String id);
 
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.sender s " +
+           "LEFT JOIN FETCH s.account " +
+           "LEFT JOIN FETCH c.pharmacy " +
+           "WHERE t.id = :id AND t.account = :account")
+    Tour findTourForTarif(@Param("account") Account account, @Param("id") String id);
+
     @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.account = :account AND t.id IN :tourIds ORDER BY t.name, c.tourOrder")
     List<Tour> findAllByIdIn(@Param("account") Account account, @Param("tourIds") List<String> tourIds);
 

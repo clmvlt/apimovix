@@ -26,4 +26,7 @@ public class AnomalieSearchDTO {
     
     @Schema(description = "Code du type d'anomalie pour filtrer", example = "TYPE1")
     private String typeCode;
+
+    @Schema(description = "Nombre maximum de résultats à retourner", example = "100")
+    private Integer max;
 } 

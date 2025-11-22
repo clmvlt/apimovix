@@ -34,11 +34,10 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "c.newPharmacy, " +
            "c.latitude, " +
            "c.longitude, " +
-           "new bzh.stack.apimovix.dto.command.CommandTourDTO(c.tour.id, c.tour.name, c.tour.color), " +
+           "c.tour, " +
            "(SELECT COUNT(p) FROM PackageEntity p WHERE p.command = c), " +
            "(SELECT COALESCE(SUM(p.weight), 0.0) FROM PackageEntity p WHERE p.command = c), " +
            "new bzh.stack.apimovix.dto.pharmacy.PharmacyDTO(c.pharmacy.cip, c.pharmacy.name, c.pharmacy.address1, c.pharmacy.city, c.pharmacy.postalCode, c.pharmacy.latitude, c.pharmacy.longitude), " +
-           "c.pharmacy.commentaire, " +
            "c.lastHistoryStatus.status) " +
            "FROM Command c " +
            "LEFT JOIN c.tour t " +
@@ -50,7 +49,7 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
     @Query("SELECT c FROM Command c WHERE c.id = :id AND c.sender.account = :account")
     public Command findCommandById(Account account, UUID id);
 
-    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account ORDER BY c.expDate DESC LIMIT 5")
+    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND c.latitude != 0 AND c.longitude != 0 ORDER BY c.expDate DESC LIMIT 5")
     public List<Command> findLast5CommandsByPharmacyCip(@Param("account") Account account, @Param("cip") String cip);
 
     @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip")
@@ -84,15 +83,14 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "AND (:pharmacyCip IS NULL OR c.pharmacy.cip LIKE %:pharmacyCip%) \n" +
            "AND (:pharmacyPostalCode IS NULL OR c.pharmacy.postalCode LIKE %:pharmacyPostalCode%) \n" +
            "AND (:address IS NULL OR LOWER(c.pharmacy.address1) LIKE %:address% OR LOWER(c.pharmacy.address2) LIKE %:address% OR LOWER(c.pharmacy.address3) LIKE %:address%) \n" +
-           "ORDER BY c.expDate DESC \n" +
-           "LIMIT 100")
+           "ORDER BY c.expDate DESC")
     public List<CommandSearchResponseDTO> searchCommandsWithoutDates(
-        @Param("account") Account account, 
-        @Param("name") String name, 
-        @Param("city") String city, 
-        @Param("pharmacyCip") String pharmacyCip, 
-        @Param("pharmacyPostalCode") String pharmacyPostalCode, 
-        @Param("address") String address, 
+        @Param("account") Account account,
+        @Param("name") String name,
+        @Param("city") String city,
+        @Param("pharmacyCip") String pharmacyCip,
+        @Param("pharmacyPostalCode") String pharmacyPostalCode,
+        @Param("address") String address,
         @Param("commandId") String commandId);
 
     @Query("SELECT new bzh.stack.apimovix.dto.command.CommandSearchResponseDTO(\n" +
@@ -118,17 +116,16 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "AND (:pharmacyPostalCode IS NULL OR c.pharmacy.postalCode LIKE %:pharmacyPostalCode%) \n" +
            "AND (:address IS NULL OR LOWER(c.pharmacy.address1) LIKE %:address% OR LOWER(c.pharmacy.address2) LIKE %:address% OR LOWER(c.pharmacy.address3) LIKE %:address%) \n" +
            "AND c.expDate >= :startDate AND c.expDate <= :endDate \n" +
-           "ORDER BY c.expDate DESC \n" +
-           "LIMIT 100")
+           "ORDER BY c.expDate DESC")
     public List<CommandSearchResponseDTO> searchCommandsWithDates(
-        @Param("account") Account account, 
-        @Param("name") String name, 
-        @Param("city") String city, 
-        @Param("pharmacyCip") String pharmacyCip, 
-        @Param("pharmacyPostalCode") String pharmacyPostalCode, 
-        @Param("address") String address, 
-        @Param("commandId") String commandId, 
-        @Param("startDate") LocalDateTime startDate, 
+        @Param("account") Account account,
+        @Param("name") String name,
+        @Param("city") String city,
+        @Param("pharmacyCip") String pharmacyCip,
+        @Param("pharmacyPostalCode") String pharmacyPostalCode,
+        @Param("address") String address,
+        @Param("commandId") String commandId,
+        @Param("startDate") LocalDateTime startDate,
         @Param("endDate") LocalDateTime endDate);
 
     

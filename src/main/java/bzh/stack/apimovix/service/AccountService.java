@@ -11,14 +11,19 @@ import org.springframework.transaction.annotation.Transactional;
 import bzh.stack.apimovix.dto.account.AccountCreateDTO;
 import bzh.stack.apimovix.dto.account.AccountUpdateDTO;
 import bzh.stack.apimovix.model.Account;
+import bzh.stack.apimovix.model.Picture.AccountLogo;
+import bzh.stack.apimovix.repository.AccountLogoRepository;
 import bzh.stack.apimovix.repository.AccountRepository;
+import bzh.stack.apimovix.service.picture.PictureService;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class AccountService {
-    
+
     private final AccountRepository accountRepository;
+    private final AccountLogoRepository accountLogoRepository;
+    private final PictureService pictureService;
     
     @Transactional(readOnly = true)
     public Optional<Account> findAccountById(UUID id) {
@@ -39,6 +44,15 @@ public class AccountService {
         }
         if (updateDTO.getAddress2() != null) {
             account.setAddress2(updateDTO.getAddress2());
+        }
+        if (updateDTO.getPostalCode() != null) {
+            account.setPostalCode(updateDTO.getPostalCode());
+        }
+        if (updateDTO.getCity() != null) {
+            account.setCity(updateDTO.getCity());
+        }
+        if (updateDTO.getCountry() != null) {
+            account.setCountry(updateDTO.getCountry());
         }
         if (updateDTO.getLatitude() != null) {
             account.setLatitude(updateDTO.getLatitude());
@@ -93,6 +107,39 @@ public class AccountService {
         }
         if (updateDTO.getAutoCreateTour() != null) {
             account.setAutoCreateTour(updateDTO.getAutoCreateTour());
+        }
+
+        // Gestion du logo
+        if (updateDTO.getLogo() != null) {
+            String logoValue = updateDTO.getLogo().trim();
+
+            // Si la chaîne est vide, supprimer le logo
+            if (logoValue.isEmpty()) {
+                if (account.getLogo() != null) {
+                    AccountLogo oldLogo = account.getLogo();
+                    pictureService.deleteImage(oldLogo.getName());
+                    account.setLogo(null);
+                    accountLogoRepository.delete(oldLogo);
+                    accountLogoRepository.flush(); // Force la suppression immédiate
+                }
+            } else {
+                // Sinon, remplacer le logo par le nouveau
+                String savedPath = pictureService.saveAccountLogo(account, logoValue);
+                if (savedPath != null) {
+                    if (account.getLogo() != null) {
+                        // Réutiliser l'entité existante au lieu d'en créer une nouvelle
+                        AccountLogo existingLogo = account.getLogo();
+                        pictureService.deleteImage(existingLogo.getName()); // Supprimer l'ancien fichier
+                        existingLogo.setName(savedPath); // Mettre à jour avec le nouveau chemin
+                    } else {
+                        // Créer un nouveau logo uniquement s'il n'en existe pas
+                        AccountLogo newLogo = new AccountLogo();
+                        newLogo.setName(savedPath);
+                        newLogo.setAccount(account);
+                        account.setLogo(newLogo);
+                    }
+                }
+            }
         }
 
         return accountRepository.save(account);

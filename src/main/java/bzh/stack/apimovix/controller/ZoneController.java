@@ -17,10 +17,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import bzh.stack.apimovix.annotation.TokenRequired;
+import bzh.stack.apimovix.dto.pharmacy.PharmacyDTO;
 import bzh.stack.apimovix.dto.zone.ZoneAssignationDTO;
 import bzh.stack.apimovix.dto.zone.ZoneDTO;
 import bzh.stack.apimovix.dto.zone.ZoneDetailDTO;
+import bzh.stack.apimovix.mapper.PharmacyMapper;
 import bzh.stack.apimovix.mapper.ZoneMapper;
+import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Zone;
 import bzh.stack.apimovix.service.ZoneService;
@@ -50,6 +53,7 @@ import lombok.RequiredArgsConstructor;
 public class ZoneController {
     private final ZoneService zoneService;
     private final ZoneMapper zoneMapper;
+    private final PharmacyMapper pharmacyMapper;
 
     @GetMapping
     @Operation(summary = "Get all zones", description = "Retrieves a list of all delivery zones for the authenticated user's account", responses = {
@@ -79,7 +83,14 @@ public class ZoneController {
             return MAPIR.notFound();
         }
 
-        return MAPIR.ok(zoneMapper.toDetailDto(optZone.get()));
+        ZoneDetailDTO zoneDetailDTO = zoneMapper.toDetailDto(optZone.get());
+        List<Pharmacy> pharmacies = zoneService.findPharmaciesByZone(profil.getAccount(), uuid);
+        List<PharmacyDTO> pharmacyDTOs = pharmacies.stream()
+                .map(pharmacyMapper::toDto)
+                .collect(Collectors.toList());
+        zoneDetailDTO.setPharmacies(pharmacyDTOs);
+
+        return MAPIR.ok(zoneDetailDTO);
     }
 
     @PutMapping("/assign/{id}")

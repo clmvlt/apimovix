@@ -51,7 +51,7 @@ public class PharmacyInfosService {
 
     @Transactional
     public Optional<PharmacyInfos> createPharmacyInfos(Profil profil, PharmacyInfosCreateDTO pharmacyInfosCreateDTO) {
-        Optional<Pharmacy> optPharmacy = pharmacyService.findPharmacy(pharmacyInfosCreateDTO.getCip());
+        Optional<Pharmacy> optPharmacy = pharmacyService.findPharmacy(pharmacyInfosCreateDTO.getCip(), profil.getAccount().getId());
         if (optPharmacy.isEmpty()) {
             return Optional.empty();
         }

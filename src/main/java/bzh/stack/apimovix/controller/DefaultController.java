@@ -38,6 +38,9 @@ public class DefaultController {
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
 
+    @Value("${spring.datasource.url}")
+    private String databaseUrl;
+
     private final JdbcTemplate jdbcTemplate;
 
     @GetMapping("/check")
@@ -67,6 +70,7 @@ public class DefaultController {
                 appVersion,
                 dbVersion,
                 dbConnected,
+                databaseUrl,
                 "OK",
                 currentTime,
                 activeProfile,

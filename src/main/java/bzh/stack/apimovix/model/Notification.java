@@ -65,6 +65,7 @@ public class Notification {
     public enum NotificationType {
         ANOMALIE,
         INFORMATION,
+        FACTURE,
         OTHER
     }
 }

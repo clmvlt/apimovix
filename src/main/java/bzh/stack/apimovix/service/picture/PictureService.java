@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import bzh.stack.apimovix.enums.PictureENUM;
+import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Pharmacy;
@@ -64,6 +65,11 @@ public class PictureService {
     public String savePharmacyInfosImage(PharmacyInfos pharmacyInfos, String base64Image) {
         String subDir = pharmacyInfos.getPharmacy().getCip() + File.separator + pharmacyInfos.getId();
         return saveBase64Image(PictureENUM.PharmacyInfos, base64Image, subDir, false);
+    }
+
+    public String saveAccountLogo(Account account, String base64Image) {
+        String subDir = account.getId().toString();
+        return saveBase64Image(PictureENUM.Account, base64Image, subDir, false);
     }
 
     public String saveBase64Image(PictureENUM type, String base64Image, String subDirectory, boolean saveCreatedAt) {

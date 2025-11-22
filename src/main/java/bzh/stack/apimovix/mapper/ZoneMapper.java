@@ -24,9 +24,9 @@ public interface ZoneMapper {
     ZoneDTO toDto(Zone zone);
 
     @Named("toDetailDto")
-    @Mapping(target = "pharmacies", source = "pharmacies", qualifiedByName = "toDetailDto")
+    @Mapping(target = "pharmacies", ignore = true)
     ZoneDetailDTO toDetailDto(Zone zone);
-    
+
     Zone toEntity(ZoneDTO dto);
     
 }

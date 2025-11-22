@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import bzh.stack.apimovix.annotation.HyperAdminRequired;
+import bzh.stack.apimovix.annotation.MobileRequired;
 import bzh.stack.apimovix.annotation.TokenNotRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.dto.profil.ForgotPasswordDTO;
@@ -108,7 +109,7 @@ public class ProfileController {
             @ApiResponse(responseCode = "400", description = "Invalid password data or passwords do not match", content = @Content),
             @ApiResponse(responseCode = "401", description = "Current password is incorrect", content = @Content),
     })
-    @TokenRequired
+    @MobileRequired
     public ResponseEntity<?> changePassword(
             HttpServletRequest request,
             @Parameter(description = "Password change data", required = true, schema = @Schema(implementation = PasswordChangeDTO.class)) @Valid @RequestBody PasswordChangeDTO passwordChangeDTO) {

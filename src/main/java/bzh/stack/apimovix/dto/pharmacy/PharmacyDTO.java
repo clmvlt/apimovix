@@ -35,6 +35,9 @@ public class PharmacyDTO {
     public PharmacyDTO(Pharmacy pharmacy) {
         this.cip = pharmacy.getCip();
         this.name = pharmacy.getName();
+
+        // Les getters sont maintenant overridés et retournent automatiquement
+        // pharmacyInformations en priorité, sinon pharmacy
         this.address1 = pharmacy.getAddress1();
         this.address2 = pharmacy.getAddress2();
         this.address3 = pharmacy.getAddress3();
@@ -52,6 +55,13 @@ public class PharmacyDTO {
         this.lastName = pharmacy.getLastName();
         this.neverOrdered = pharmacy.getNeverOrdered();
         this.commentaire = pharmacy.getCommentaire();
+
+        // Zone et Account viennent uniquement de pharmacyInformations
+        if (pharmacy.getZone() != null) {
+            this.zone = new ZoneDTO();
+            this.zone.setId(pharmacy.getZone().getId());
+            this.zone.setName(pharmacy.getZone().getName());
+        }
         this.accountId = pharmacy.getAccount() != null ? pharmacy.getAccount().getId() : null;
     }
 
