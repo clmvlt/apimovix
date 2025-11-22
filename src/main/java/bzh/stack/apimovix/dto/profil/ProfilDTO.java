@@ -22,4 +22,5 @@ public class ProfilDTO {
     private Boolean isStock;
     private Boolean isAvtrans;
     private Boolean isActive;
+    private String profilPicture;
 }

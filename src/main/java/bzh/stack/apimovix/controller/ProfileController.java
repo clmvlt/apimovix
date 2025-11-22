@@ -24,6 +24,7 @@ import bzh.stack.apimovix.dto.profil.ForgotPasswordDTO;
 import bzh.stack.apimovix.dto.profil.PasswordChangeDTO;
 import bzh.stack.apimovix.dto.profil.ProfilCreateDTO;
 import bzh.stack.apimovix.dto.profil.ProfilDTO;
+import bzh.stack.apimovix.dto.profil.ProfilMobileUpdateDTO;
 import bzh.stack.apimovix.dto.profil.ProfilUpdateDTO;
 import bzh.stack.apimovix.dto.profil.ResetPasswordDTO;
 import bzh.stack.apimovix.mapper.ProfileMapper;
@@ -101,6 +102,20 @@ public class ProfileController {
             return MAPIR.notFound();
         }
         return MAPIR.noContent();
+    }
+
+    @PutMapping("/update-profil")
+    @Operation(summary = "Update own profile from mobile", description = "Updates the authenticated user's profile (firstName, lastName, birthday, email, profilPicture)", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated profile", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ProfilDTO.class))),
+            @ApiResponse(responseCode = "409", description = "Conflict - Email already used", content = @Content),
+    })
+    @MobileRequired
+    public ResponseEntity<?> updateOwnProfile(
+            HttpServletRequest request,
+            @Parameter(description = "Profile update data", required = true, schema = @Schema(implementation = ProfilMobileUpdateDTO.class)) @Valid @RequestBody ProfilMobileUpdateDTO profilMobileUpdateDTO) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        Profil updatedProfil = profileService.updateProfilFromMobile(profil, profilMobileUpdateDTO);
+        return MAPIR.ok(profileMapper.toDto(updatedProfil));
     }
 
     @PutMapping("/change-password")

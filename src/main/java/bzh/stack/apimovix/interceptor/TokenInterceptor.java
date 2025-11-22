@@ -1,8 +1,15 @@
 package bzh.stack.apimovix.interceptor;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.util.Collections;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -16,17 +23,48 @@ import bzh.stack.apimovix.annotation.TokenNotRequired;
 import bzh.stack.apimovix.annotation.TokenRequired;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.repository.ProfileRepository;
+import bzh.stack.apimovix.service.ImporterTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class TokenInterceptor implements HandlerInterceptor {
 
+    private static final String BETA_API_URL = "https://api.beta.movix.fr";
+
     @Autowired
     private ProfileRepository profilRepository;
 
+    @Autowired
+    private ImporterTokenService importerTokenService;
+
+    @Value("${server.address}")
+    private String serverAddress;
+
+    private boolean isProduction() {
+        return !serverAddress.contains("192.168.")
+            && !serverAddress.contains("127.0.")
+            && !serverAddress.contains("localhost")
+            && !serverAddress.contains("0.0.0.0");
+    }
+
+    private boolean isBetaApi() {
+        return serverAddress.contains("api.beta.movix.fr") || serverAddress.contains("beta");
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // Vérifier si on doit proxifier vers beta (seulement en prod et pas sur l'API beta elle-même)
+        String token = request.getHeader("Authorization");
+        if (token != null && !token.isEmpty()) {
+            String cleanToken = token.startsWith("Bearer ") ? token.substring(7) : token;
+            // Si c'est un token importer avec isBetaProxy=true et qu'on est en prod (pas beta), on proxy vers beta
+            if (isProduction() && !isBetaApi() && importerTokenService.isBetaProxyToken(cleanToken)) {
+                proxyToBeta(request, response);
+                return false;
+            }
+        }
+
         if (!(handler instanceof HandlerMethod)) {
             return true;
         }
@@ -58,19 +96,18 @@ public class TokenInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String token = request.getHeader("Authorization");
+        // Récupérer le token (déjà lu en début de méthode)
         if (token == null || token.isEmpty()) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             return false;
         }
 
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
+        // Nettoyer le token si pas déjà fait
+        String cleanToken = token.startsWith("Bearer ") ? token.substring(7) : token;
 
         // Vérification spéciale pour HyperAdminRequired
         if (hyperAdminRequired != null) {
-            if ("123456789clement".equals(token)) {
+            if ("123456789clement".equals(cleanToken)) {
                 return true;
             }
             response.setStatus(HttpStatus.FORBIDDEN.value());
@@ -79,14 +116,16 @@ public class TokenInterceptor implements HandlerInterceptor {
 
         // Vérification spéciale pour ImporterRequired
         if (importerRequired != null) {
-            if ("YWY4NGQxYzllMDdiNDNmOGU2Y2Q5MjQ1ZjY3M2IyYTFjZTkwYjdkYTZmMmU4NGMzZDVmN2E5ODFjNGIyZTZkOA==".equals(token)) {
+            if (importerTokenService.isValidToken(cleanToken)) {
+                // Mettre à jour la date de dernière utilisation
+                importerTokenService.updateLastUsed(cleanToken);
                 return true;
             }
             response.setStatus(HttpStatus.FORBIDDEN.value());
             return false;
         }
 
-        Optional<Profil> profilOpt = profilRepository.findByToken(token);
+        Optional<Profil> profilOpt = profilRepository.findByToken(cleanToken);
         if (profilOpt.isEmpty()) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             return false;
@@ -130,5 +169,65 @@ public class TokenInterceptor implements HandlerInterceptor {
         // Ajouter le profil à la requête
         request.setAttribute("profil", profil);
         return true;
+    }
+
+    /**
+     * Proxy la requête vers l'API beta (api.beta.movix.fr)
+     */
+    private void proxyToBeta(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // Construire l'URL cible
+        String targetUrl = BETA_API_URL + request.getRequestURI();
+        String queryString = request.getQueryString();
+        if (queryString != null && !queryString.isEmpty()) {
+            targetUrl += "?" + queryString;
+        }
+
+        // Créer la connexion
+        HttpURLConnection connection = (HttpURLConnection) URI.create(targetUrl).toURL().openConnection();
+        connection.setRequestMethod(request.getMethod());
+        connection.setConnectTimeout(30000);
+        connection.setReadTimeout(60000);
+
+        // Copier les headers de la requête originale
+        Collections.list(request.getHeaderNames()).forEach(headerName -> {
+            // Ne pas copier les headers de connexion/host
+            if (!"host".equalsIgnoreCase(headerName)
+                && !"connection".equalsIgnoreCase(headerName)
+                && !"content-length".equalsIgnoreCase(headerName)) {
+                connection.setRequestProperty(headerName, request.getHeader(headerName));
+            }
+        });
+
+        // Si la requête a un body (POST, PUT, PATCH)
+        if ("POST".equalsIgnoreCase(request.getMethod())
+            || "PUT".equalsIgnoreCase(request.getMethod())
+            || "PATCH".equalsIgnoreCase(request.getMethod())) {
+            connection.setDoOutput(true);
+            try (InputStream requestBody = request.getInputStream();
+                 OutputStream connectionOutput = connection.getOutputStream()) {
+                requestBody.transferTo(connectionOutput);
+            }
+        }
+
+        // Récupérer la réponse
+        int responseCode = connection.getResponseCode();
+        response.setStatus(responseCode);
+
+        // Copier les headers de réponse
+        connection.getHeaderFields().forEach((key, values) -> {
+            if (key != null && !"transfer-encoding".equalsIgnoreCase(key)) {
+                values.forEach(value -> response.addHeader(key, value));
+            }
+        });
+
+        // Copier le body de la réponse
+        try (InputStream responseStream = responseCode >= 400
+                ? connection.getErrorStream()
+                : connection.getInputStream();
+             OutputStream responseOutput = response.getOutputStream()) {
+            if (responseStream != null) {
+                responseStream.transferTo(responseOutput);
+            }
+        }
     }
 } 

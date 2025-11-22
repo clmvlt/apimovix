@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import bzh.stack.apimovix.dto.profil.ProfilCreateDTO;
+import bzh.stack.apimovix.dto.profil.ProfilMobileUpdateDTO;
 import bzh.stack.apimovix.dto.profil.ProfilUpdateDTO;
 import bzh.stack.apimovix.exception.FieldAlreadyUsed;
 import bzh.stack.apimovix.exception.ProfileLimitExceededException;
@@ -24,6 +25,7 @@ import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.repository.AccountRepository;
 import bzh.stack.apimovix.repository.PasswordResetTokenRepository;
 import bzh.stack.apimovix.repository.ProfileRepository;
+import bzh.stack.apimovix.service.picture.PictureService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -34,6 +36,7 @@ public class ProfileService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
     private final AccountRepository accountRepository;
+    private final PictureService pictureService;
 
     @Transactional(readOnly = true)
     public Optional<Profil> findProfile(Account account, UUID id) {
@@ -79,6 +82,12 @@ public class ProfileService {
             profil.setIsActive(true);
         }
 
+        // Handle profile picture if provided (base64)
+        if (createDTO.getProfilPicture() != null && !createDTO.getProfilPicture().trim().isEmpty()) {
+            String picturePath = pictureService.saveProfilPicture(profil, createDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
+        }
+
         return profileRepository.save(profil);
     }
 
@@ -110,10 +119,20 @@ public class ProfileService {
         }
 
         profileMapper.updateEntityFromCreateDto(createDTO, profil);
-        
+
         // Ne mettre à jour le mot de passe que s'il est fourni
         if (createDTO.getPassword() != null && !createDTO.getPassword().trim().isEmpty()) {
             profil.setPasswordHash(hashPassword(createDTO.getPassword()));
+        }
+
+        // Handle profile picture if provided (base64)
+        if (createDTO.getProfilPicture() != null && !createDTO.getProfilPicture().trim().isEmpty()) {
+            // Delete old picture if exists
+            if (profil.getProfilPicture() != null && !profil.getProfilPicture().trim().isEmpty()) {
+                pictureService.deleteImage(profil.getProfilPicture());
+            }
+            String picturePath = pictureService.saveProfilPicture(profil, createDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
         }
 
         return Optional.of(profileRepository.save(profil));
@@ -147,6 +166,16 @@ public class ProfileService {
             throw new FieldAlreadyUsed("identifiant");
         }
         profileMapper.updateEntityFromUpdateDto(updateDTO, profil);
+
+        // Handle profile picture if provided (base64)
+        if (updateDTO.getProfilPicture() != null && !updateDTO.getProfilPicture().trim().isEmpty()) {
+            // Delete old picture if exists
+            if (profil.getProfilPicture() != null && !profil.getProfilPicture().trim().isEmpty()) {
+                pictureService.deleteImage(profil.getProfilPicture());
+            }
+            String picturePath = pictureService.saveProfilPicture(profil, updateDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
+        }
 
         return Optional.of(profileRepository.save(profil));
     }
@@ -447,6 +476,12 @@ public class ProfileService {
             profil.setIsActive(true);
         }
 
+        // Handle profile picture if provided (base64)
+        if (createDTO.getProfilPicture() != null && !createDTO.getProfilPicture().trim().isEmpty()) {
+            String picturePath = pictureService.saveProfilPicture(profil, createDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
+        }
+
         return Optional.of(profileRepository.save(profil));
     }
 
@@ -475,6 +510,17 @@ public class ProfileService {
         }
 
         profileMapper.updateEntityFromUpdateDto(updateDTO, profil);
+
+        // Handle profile picture if provided (base64)
+        if (updateDTO.getProfilPicture() != null && !updateDTO.getProfilPicture().trim().isEmpty()) {
+            // Delete old picture if exists
+            if (profil.getProfilPicture() != null && !profil.getProfilPicture().trim().isEmpty()) {
+                pictureService.deleteImage(profil.getProfilPicture());
+            }
+            String picturePath = pictureService.saveProfilPicture(profil, updateDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
+        }
+
         return Optional.of(profileRepository.save(profil));
     }
 
@@ -499,5 +545,51 @@ public class ProfileService {
     @Transactional(readOnly = true)
     public Optional<Profil> findProfileByIdForHyperAdmin(UUID id) {
         return profileRepository.findById(id);
+    }
+
+    /**
+     * Update profile from mobile app (only specific fields: profilPicture, birthday, firstName, lastName, email)
+     */
+    @Transactional
+    public Profil updateProfilFromMobile(Profil profil, ProfilMobileUpdateDTO updateDTO) {
+        // Validate email if provided and different from current
+        if (updateDTO.getEmail() != null && !updateDTO.getEmail().trim().isEmpty()
+            && !updateDTO.getEmail().equals(profil.getEmail())
+            && profileRepository.existsByEmailAndIdNot(updateDTO.getEmail(), profil.getId())) {
+            throw new FieldAlreadyUsed("email");
+        }
+
+        // Update firstName if provided
+        if (updateDTO.getFirstName() != null) {
+            profil.setFirstName(updateDTO.getFirstName());
+        }
+
+        // Update lastName if provided
+        if (updateDTO.getLastName() != null) {
+            profil.setLastName(updateDTO.getLastName());
+        }
+
+        // Update birthday if provided
+        if (updateDTO.getBirthday() != null) {
+            profil.setBirthday(updateDTO.getBirthday());
+        }
+
+        // Update email if provided
+        if (updateDTO.getEmail() != null && !updateDTO.getEmail().trim().isEmpty()) {
+            profil.setEmail(updateDTO.getEmail());
+        }
+
+        // Handle profile picture - save base64 image and update path
+        if (updateDTO.getProfilPicture() != null && !updateDTO.getProfilPicture().trim().isEmpty()) {
+            // Delete old picture if exists
+            if (profil.getProfilPicture() != null && !profil.getProfilPicture().trim().isEmpty()) {
+                pictureService.deleteImage(profil.getProfilPicture());
+            }
+            // Save new picture
+            String picturePath = pictureService.saveProfilPicture(profil, updateDTO.getProfilPicture());
+            profil.setProfilPicture(picturePath);
+        }
+
+        return profileRepository.save(profil);
     }
 } 

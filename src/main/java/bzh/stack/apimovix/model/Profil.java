@@ -84,6 +84,9 @@ public class Profil {
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isActive = true;
 
+    @Column(name = "profil_picture")
+    private String profilPicture;
+
     public String getFullName() {
         StringBuilder fullName = new StringBuilder();
         if (firstName != null) {

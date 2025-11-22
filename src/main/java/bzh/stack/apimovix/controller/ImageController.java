@@ -131,4 +131,24 @@ public class ImageController {
 
         return MAPIR.file(file);
     }
+
+    @GetMapping("/profil/{profilId}/{imageId}")
+    @Operation(summary = "Get profile picture", description = "Retrieves the profile picture associated with a specific user profile using profile ID and image ID", responses = {
+            @ApiResponse(responseCode = "200", description = "Profile picture successfully retrieved", content = @Content(mediaType = "image/*")),
+            @ApiResponse(responseCode = "404", description = "Profile picture not found", content = @Content)
+    })
+    public ResponseEntity<?> getProfilPicture(
+            @Parameter(description = "ID of the profile", required = true) @PathVariable String profilId,
+            @Parameter(description = "ID of the image to retrieve", required = true) @PathVariable String imageId)
+            throws IOException {
+
+        String path = String.format("profil/%s/%s", profilId, imageId);
+
+        File file = pictureService.findImageFile(path);
+        if (file == null) {
+            return MAPIR.notFound();
+        }
+
+        return MAPIR.file(file);
+    }
 }

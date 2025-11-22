@@ -23,6 +23,7 @@ public class ProfilUpdateDTO {
     private Boolean isStock;
     private Boolean isAvtrans;
     private Boolean isActive;
+    private String profilPicture;
 
     @AssertTrue(message = GLOBAL.REQUIRED)
     private boolean isEmail() {

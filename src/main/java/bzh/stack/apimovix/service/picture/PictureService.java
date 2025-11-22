@@ -22,6 +22,7 @@ import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInfos;
+import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Picture.AnomaliePicture;
 import bzh.stack.apimovix.model.Picture.CommandPicture;
 import bzh.stack.apimovix.model.Picture.PharmacyInfosPicture;
@@ -70,6 +71,11 @@ public class PictureService {
     public String saveAccountLogo(Account account, String base64Image) {
         String subDir = account.getId().toString();
         return saveBase64Image(PictureENUM.Account, base64Image, subDir, false);
+    }
+
+    public String saveProfilPicture(Profil profil, String base64Image) {
+        String subDir = profil.getId().toString();
+        return saveBase64Image(PictureENUM.Profil, base64Image, subDir, false);
     }
 
     public String saveBase64Image(PictureENUM type, String base64Image, String subDirectory, boolean saveCreatedAt) {
