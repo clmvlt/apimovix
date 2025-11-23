@@ -110,11 +110,9 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
         return pharmacies;
     }
 
-    @Query(value = "SELECT DISTINCT p.* FROM pharmacy p " +
-           "LEFT JOIN pharmacy_informations pi ON p.cip = pi.cip " +
-           "LEFT JOIN pharmacy_picture pp ON p.cip = pp.cip " +
-           "WHERE CAST(pi.id_account AS VARCHAR) = :accountId " +
-           "AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+    @Query(value = "SELECT DISTINCT p.cip FROM pharmacy p " +
+           "LEFT JOIN pharmacy_informations pi ON p.cip = pi.cip AND CAST(pi.id_account AS VARCHAR) = :accountId " +
+           "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:city IS NULL OR " +
            "    (LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :city, '%')) OR " +
            "     (:cityAlias IS NOT NULL AND LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :cityAlias, '%'))))) " +
@@ -135,7 +133,7 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
            "    (:hasOrdered = false AND pi.never_ordered = true))" +
            " ORDER BY p.cip LIMIT :maxResults",
            nativeQuery = true)
-    List<Pharmacy> searchPharmaciesByAccount(
+    List<String> searchPharmaciesCipsByAccount(
         @Param("accountId") String accountId,
         @Param("name") String name,
         @Param("city") String city,

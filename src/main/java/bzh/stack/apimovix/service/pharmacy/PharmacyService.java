@@ -308,7 +308,8 @@ public class PharmacyService {
         }
 
         // Utiliser la requête native qui supporte tous les filtres (zoneId, hasOrdered)
-        List<Pharmacy> pharmacies = pharmacyRepository.searchPharmaciesByAccount(
+        // Cette requête retourne les CIPs des pharmacies correspondant aux critères
+        List<String> cips = pharmacyRepository.searchPharmaciesCipsByAccount(
                 account.getId().toString(),
                 name,
                 city,
@@ -321,9 +322,12 @@ public class PharmacyService {
                 pharmacySearchDTO.getZoneId(),
                 pharmacySearchDTO.getHasOrdered());
 
-        if (pharmacies.isEmpty()) {
+        if (cips.isEmpty()) {
             return new java.util.ArrayList<>();
         }
+
+        // Charger les pharmacies avec leurs informations via JPQL pour avoir les relations JPA
+        List<Pharmacy> pharmacies = pharmacyRepository.findPharmaciesByCips(cips, account.getId());
 
         // Filter pictures by account
         filterPicturesByAccount(pharmacies, account.getId());
