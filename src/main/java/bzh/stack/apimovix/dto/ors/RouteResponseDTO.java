@@ -13,4 +13,5 @@ public class RouteResponseDTO {
     private Double duration;
     private String geometry;
     private List<List<Double>> coordinates = new ArrayList<>();
+    private List<RouteSegmentDTO> segments = new ArrayList<>(); // Durées et distances entre chaque point
 }

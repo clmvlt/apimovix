@@ -101,7 +101,8 @@ public class UpdateController {
     @GetMapping("/download/{version}")
     @Operation(summary = "Download APK", description = "Downloads the APK file for a specific version", responses = {
             @ApiResponse(responseCode = "200", description = "Successfully downloaded APK", content = @Content(mediaType = "application/vnd.android.package-archive")),
-            @ApiResponse(responseCode = "404", description = "Version not found", content = @Content)
+            @ApiResponse(responseCode = "404", description = "Version not found", content = @Content),
+            @ApiResponse(responseCode = "410", description = "File no longer available", content = @Content)
     })
     public ResponseEntity<?> downloadApk(
             @Parameter(description = "Version to download", required = true) @PathVariable String version) throws IOException {
@@ -112,7 +113,7 @@ public class UpdateController {
 
         File file = fileService.findFile(update.get().getFilePath());
         if (file == null) {
-            return MAPIR.notFound();
+            return MAPIR.gone("File no longer available on server");
         }
 
         return MAPIR.file(file);

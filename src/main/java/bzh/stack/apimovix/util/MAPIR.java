@@ -112,12 +112,26 @@ public class MAPIR {
      */
     public static ResponseEntity<?> file(File file) {
         try {
-            byte[] imageBytes = Files.readAllBytes(file.toPath());
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
             String contentType = Files.probeContentType(file.toPath());
-            
+            String fileName = file.getName();
+
+            // Fallback pour les types MIME non reconnus
+            if (contentType == null) {
+                if (fileName.toLowerCase().endsWith(".apk")) {
+                    contentType = "application/vnd.android.package-archive";
+                } else {
+                    contentType = "application/octet-stream";
+                }
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(contentType));
+            headers.setContentDispositionFormData("attachment", fileName);
+
             return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .body(imageBytes);
+                .headers(headers)
+                .body(fileBytes);
         } catch (IOException e) {
             return MAPIR.internalServerError();
         }
@@ -146,9 +160,18 @@ public class MAPIR {
 
     /**
      * Retourne une réponse avec le code HTTP 409 (Conflict)
-     * @return ResponseEntity avec le code 401
+     * @return ResponseEntity avec le code 409
      */
     public static ResponseEntity<?> conflict(String message) {
         return ResponseEntity.status(409).body(message);
+    }
+
+    /**
+     * Retourne une réponse avec le code HTTP 410 (Gone)
+     * @param message Le message indiquant que la ressource n'est plus disponible
+     * @return ResponseEntity avec le code 410
+     */
+    public static ResponseEntity<?> gone(String message) {
+        return ResponseEntity.status(410).body(message);
     }
 } 

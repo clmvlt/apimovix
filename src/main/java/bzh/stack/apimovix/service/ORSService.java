@@ -25,6 +25,7 @@ import bzh.stack.apimovix.dto.ors.OptimizeRequestDTO;
 import bzh.stack.apimovix.dto.ors.OptimizeResponseDTO;
 import bzh.stack.apimovix.dto.ors.RouteRequestDTO;
 import bzh.stack.apimovix.dto.ors.RouteResponseDTO;
+import bzh.stack.apimovix.dto.ors.RouteSegmentDTO;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Tour;
 
@@ -139,7 +140,14 @@ public class ORSService {
                 return Optional.empty();
             }
 
-            return Optional.of(createRouteResponse(routes.get(0), request.getReturnCoords()));
+            RouteResponseDTO routeResponse = createRouteResponse(routes.get(0), request.getReturnCoords());
+
+            // Calculer les segments entre chaque point si plus de 2 points
+            if (request.getCoordinates() != null && request.getCoordinates().size() > 1) {
+                routeResponse.setSegments(calculateSegments(request.getCoordinates()));
+            }
+
+            return Optional.of(routeResponse);
         } catch (Exception e) {
             logger.error("Erreur lors de la récupération de l'itinéraire: {}", e.getMessage(), e);
             return Optional.empty();
@@ -152,7 +160,7 @@ public class ORSService {
                 });
 
         RouteResponseDTO responseDTO = new RouteResponseDTO();
-        
+
         // Vérification que le summary n'est pas null
         if (summary == null) {
             logger.warn("Le summary de l'itinéraire est null, utilisation de valeurs par défaut");
@@ -162,7 +170,7 @@ public class ORSService {
             responseDTO.setCoordinates(returnCoords ? decodePolyline(responseDTO.getGeometry()) : new ArrayList<>());
             return responseDTO;
         }
-        
+
         // Gestion sécurisée de la distance avec valeur par défaut
         Object distanceObj = summary.get("distance");
         double distance = 0.0;
@@ -179,7 +187,7 @@ public class ORSService {
         }
         responseDTO.setDistance(round(distance / 1000.0 * DISTANCE_CONVERSION_FACTOR)
                 / DISTANCE_CONVERSION_FACTOR);
-        
+
         // Gestion sécurisée de la durée avec valeur par défaut
         Object durationObj = summary.get("duration");
         double duration = 0.0;
@@ -196,7 +204,7 @@ public class ORSService {
         }
         responseDTO.setDuration(round(duration / DURATION_CONVERSION_FACTOR * ROUNDING_FACTOR)
                 / ROUNDING_FACTOR);
-        
+
         responseDTO.setGeometry((String) route.get("geometry"));
         responseDTO.setCoordinates(returnCoords ? decodePolyline(responseDTO.getGeometry()) : new ArrayList<>());
 
@@ -205,6 +213,112 @@ public class ORSService {
 
     private double round(double value) {
         return Math.round(value);
+    }
+
+    /**
+     * Calcule les segments (durées et distances) entre chaque point consécutif
+     *
+     * @param coordinates Liste des coordonnées
+     * @return Liste des segments avec durées et distances
+     */
+    private List<RouteSegmentDTO> calculateSegments(List<CoordsDTO> coordinates) {
+        List<RouteSegmentDTO> segments = new ArrayList<>();
+
+        if (coordinates == null || coordinates.size() < 2) {
+            return segments;
+        }
+
+        double cumulativeDistance = 0.0;
+        double cumulativeDuration = 0.0;
+
+        // Premier segment (point de départ)
+        RouteSegmentDTO firstSegment = new RouteSegmentDTO();
+        firstSegment.setCoord(coordinates.get(0));
+        firstSegment.setDistance(0.0);
+        firstSegment.setDuration(0.0);
+        firstSegment.setCumulativeDistance(0.0);
+        firstSegment.setCumulativeDuration(0.0);
+        segments.add(firstSegment);
+
+        // Calculer pour chaque segment suivant
+        for (int i = 1; i < coordinates.size(); i++) {
+            CoordsDTO from = coordinates.get(i - 1);
+            CoordsDTO to = coordinates.get(i);
+
+            RouteSegmentDTO segment = new RouteSegmentDTO();
+            segment.setCoord(to);
+
+            // Calculer la distance et durée depuis le point précédent
+            RouteRequestDTO segmentRequest = new RouteRequestDTO();
+            segmentRequest.setCoordinates(List.of(from, to));
+            segmentRequest.setReturnCoords(false);
+
+            Optional<RouteResponseDTO> segmentRoute = getSegmentRoute(segmentRequest);
+
+            if (segmentRoute.isPresent()) {
+                double segmentDistance = segmentRoute.get().getDistance();
+                double segmentDuration = segmentRoute.get().getDuration();
+
+                segment.setDistance(segmentDistance);
+                segment.setDuration(segmentDuration);
+
+                cumulativeDistance += segmentDistance;
+                cumulativeDuration += segmentDuration;
+            } else {
+                segment.setDistance(0.0);
+                segment.setDuration(0.0);
+            }
+
+            segment.setCumulativeDistance(cumulativeDistance);
+            segment.setCumulativeDuration(cumulativeDuration);
+            segments.add(segment);
+        }
+
+        return segments;
+    }
+
+    /**
+     * Récupère les informations d'un segment sans recalculer les segments internes
+     * (évite la récursion infinie)
+     */
+    private Optional<RouteResponseDTO> getSegmentRoute(RouteRequestDTO request) {
+        try {
+            List<List<Double>> reversedCoordinates = request.getCoordinates().stream()
+                    .map(coord -> List.of(coord.getLon(), coord.getLat()))
+                    .toList();
+
+            Map<String, Object> body = Map.of(
+                    "coordinates", reversedCoordinates,
+                    "geometry", false);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+            Map<String, Object> response = restTemplate.exchange(
+                    BASE_URL,
+                    HttpMethod.POST,
+                    requestEntity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    }).getBody();
+
+            if (response == null || !response.containsKey("routes")) {
+                return Optional.empty();
+            }
+
+            List<Map<String, Object>> routes = objectMapper.convertValue(response.get("routes"),
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+
+            if (routes.isEmpty()) {
+                return Optional.empty();
+            }
+
+            return Optional.of(createRouteResponse(routes.get(0), false));
+        } catch (Exception e) {
+            logger.debug("Erreur lors du calcul d'un segment: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

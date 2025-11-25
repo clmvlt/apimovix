@@ -111,7 +111,7 @@ public class PharmacyController {
     }
 
     @PostMapping("/{cip}/picture")
-    @Operation(summary = "Upload pharmacy picture", description = "Uploads a picture associated with a specific pharmacy, filtered by account", responses = {
+    @Operation(summary = "Upload pharmacy picture", description = "Uploads a picture associated with a specific pharmacy, filtered by account. You can optionally specify displayOrder to set the picture order.", responses = {
             @ApiResponse(responseCode = "201", description = "Successfully uploaded pharmacy picture", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyPicture.class))),
             @ApiResponse(responseCode = "404", description = "Pharmacy not found or doesn't belong to your account", content = @Content),
             @ApiResponse(responseCode = "500", description = "Internal server error while processing picture", content = @Content),
@@ -119,20 +119,59 @@ public class PharmacyController {
     public ResponseEntity<?> uploadPicture(
             ServletRequest request,
             @Parameter(description = "CIP code of the pharmacy to upload picture for", required = true) @PathVariable String cip,
-            @Parameter(description = "Picture data in base64 format", required = true, schema = @Schema(implementation = PictureDTO.class)) @RequestBody PictureDTO body) {
+            @Parameter(description = "Picture data with optional displayOrder", required = true, schema = @Schema(implementation = PictureDTO.class)) @RequestBody PictureDTO body) {
         Profil profil = (Profil) request.getAttribute("profil");
         Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
         if (pharmacy.isEmpty()) {
             return MAPIR.notFound();
         }
 
-        PharmacyPicture picture = pharmacyService.createPharmacyPicture(pharmacy.get(), profil.getAccount(), body.getBase64());
+        PharmacyPicture picture = pharmacyService.createPharmacyPicture(pharmacy.get(), profil.getAccount(), body.getBase64(), body.getDisplayOrder());
 
         if (picture == null) {
             return MAPIR.internalServerError();
         }
 
         return MAPIR.created(picture);
+    }
+
+    @PutMapping("/{cip}/picture/{id}")
+    @Operation(summary = "Update pharmacy picture", description = "Updates a pharmacy picture's image and/or display order. Both base64 and displayOrder are optional - you can update one or both.", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated pharmacy picture", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = PharmacyPicture.class))),
+            @ApiResponse(responseCode = "404", description = "Pharmacy or picture not found, or doesn't belong to your account", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error while processing picture", content = @Content),
+    })
+    public ResponseEntity<?> updatePicture(
+            ServletRequest request,
+            @Parameter(description = "CIP code of the pharmacy", required = true) @PathVariable String cip,
+            @Parameter(description = "UUID of the picture to update", required = true, schema = @Schema(type = "string", format = "uuid")) @PathVariable String id,
+            @Parameter(description = "Picture data to update (base64 and/or displayOrder)", required = true, schema = @Schema(implementation = PictureDTO.class)) @RequestBody PictureDTO body) {
+        Profil profil = (Profil) request.getAttribute("profil");
+        Optional<Pharmacy> pharmacy = pharmacyService.findPharmacyByAccount(profil.getAccount(), cip);
+        if (pharmacy.isEmpty()) {
+            return MAPIR.notFound();
+        }
+
+        UUID pictureId;
+        try {
+            pictureId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            return MAPIR.badRequest("Invalid picture ID format");
+        }
+
+        PharmacyPicture picture = pharmacyService.updatePharmacyPicture(
+                pharmacy.get(),
+                profil.getAccount(),
+                pictureId,
+                body.getBase64(),
+                body.getDisplayOrder()
+        );
+
+        if (picture == null) {
+            return MAPIR.notFound();
+        }
+
+        return MAPIR.ok(picture);
     }
 
     @DeleteMapping("/{cip}/picture/{id}")

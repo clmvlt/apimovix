@@ -17,7 +17,7 @@ import bzh.stack.apimovix.model.Pharmacy;
     componentModel = "spring",
     unmappedTargetPolicy = ReportingPolicy.IGNORE,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {ZoneMapper.class, PharmacyInformationsMapper.class}
+    uses = {ZoneMapper.class, PharmacyInformationsMapper.class, PharmacyPictureMapper.class}
 )
 @Component
 public interface PharmacyMapper {
@@ -26,6 +26,7 @@ public interface PharmacyMapper {
     PharmacyDTO toDto(Pharmacy pharmacy);
 
     @Named("toDetailDto")
+    @Mapping(target = "pictures", source = "pictures")
     PharmacyDetailDTO toDetailDto(Pharmacy pharmacy);
 
     Pharmacy toEntity(PharmacyUpdateDTO dto);

@@ -34,6 +34,9 @@ public class PharmacyInfosPicture {
     @Column(name = "name")
     private String name;
 
+    @Column(name = "display_order")
+    private Integer displayOrder;
+
     @CreationTimestamp
     @Column(name = "created_at")
     @JsonFormat(pattern = PATTERNS.DATETIME)

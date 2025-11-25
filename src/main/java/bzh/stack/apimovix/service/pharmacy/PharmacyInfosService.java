@@ -66,10 +66,17 @@ public class PharmacyInfosService {
 
         final PharmacyInfos savedPharmacyInfos = pharmacyInfosRepository.save(pharmacyInfos);
 
-        List<PharmacyInfosPicture> pharmacyInfosPictures = pharmacyInfosCreateDTO.getPictures().stream()
-            .map(picture -> createPharmacyInfosPicture(picture, savedPharmacyInfos))
-            .toList();
-        
+        // Get initial display order
+        Integer maxOrder = pharmacyInfosPictureRepository.findMaxDisplayOrderByPharmacyInfos(savedPharmacyInfos.getId());
+        int currentOrder = (maxOrder == null ? 0 : maxOrder);
+
+        List<PharmacyInfosPicture> pharmacyInfosPictures = new java.util.ArrayList<>();
+        for (PictureDTO pictureDTO : pharmacyInfosCreateDTO.getPictures()) {
+            currentOrder++;
+            PharmacyInfosPicture picture = createPharmacyInfosPicture(pictureDTO, savedPharmacyInfos, currentOrder);
+            pharmacyInfosPictures.add(picture);
+        }
+
         pharmacyInfosPictureRepository.saveAll(pharmacyInfosPictures);
 
         savedPharmacyInfos.getPictures().clear();
@@ -99,10 +106,19 @@ public class PharmacyInfosService {
 
     @Transactional
     public PharmacyInfosPicture createPharmacyInfosPicture(PictureDTO picture, PharmacyInfos pharmacyInfos) {
+        // Get next display order
+        Integer maxOrder = pharmacyInfosPictureRepository.findMaxDisplayOrderByPharmacyInfos(pharmacyInfos.getId());
+        Integer nextOrder = (maxOrder == null ? 0 : maxOrder) + 1;
+
+        return createPharmacyInfosPicture(picture, pharmacyInfos, nextOrder);
+    }
+
+    private PharmacyInfosPicture createPharmacyInfosPicture(PictureDTO picture, PharmacyInfos pharmacyInfos, int displayOrder) {
         String fileName = pictureService.savePharmacyInfosImage(pharmacyInfos, picture.getBase64());
         PharmacyInfosPicture pharmacyInfosPicture = new PharmacyInfosPicture();
         pharmacyInfosPicture.setName(fileName);
         pharmacyInfosPicture.setPharmacyInfos(pharmacyInfos);
+        pharmacyInfosPicture.setDisplayOrder(displayOrder);
         return pharmacyInfosPicture;
     }
 

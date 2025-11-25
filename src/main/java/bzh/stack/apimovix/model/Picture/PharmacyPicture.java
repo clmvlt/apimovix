@@ -43,6 +43,9 @@ public class PharmacyPicture {
     @JoinColumn(name = "id_account")
     private Account account;
 
+    @Column(name = "display_order")
+    private Integer displayOrder;
+
     @CreationTimestamp
     @Column(name = "created_at")
     @JsonFormat(pattern = PATTERNS.DATETIME)

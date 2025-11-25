@@ -44,7 +44,18 @@ public class MobileUpdateService {
 
     @Transactional(readOnly = true)
     public Optional<MobileUpdate> getUpdateByVersion(String version) {
-        return mobileUpdateRepository.findById(UUID.fromString(version));
+        // Try to find by UUID first (for backward compatibility)
+        try {
+            UUID uuid = UUID.fromString(version);
+            Optional<MobileUpdate> byId = mobileUpdateRepository.findById(uuid);
+            if (byId.isPresent()) {
+                return byId;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Not a valid UUID, try by version string
+        }
+        // Find by version string (e.g. "1.0.0")
+        return mobileUpdateRepository.findByVersion(version);
     }
 
     @Transactional

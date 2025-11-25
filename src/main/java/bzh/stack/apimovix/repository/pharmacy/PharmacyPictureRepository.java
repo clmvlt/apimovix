@@ -22,4 +22,7 @@ public interface PharmacyPictureRepository extends JpaRepository<PharmacyPicture
     List<PharmacyPicture> findByCreatedAtBefore(LocalDateTime cutoffDate);
 
     long countByCreatedAtBefore(LocalDateTime cutoffDate);
+
+    @Query("SELECT COALESCE(MAX(p.displayOrder), 0) FROM PharmacyPicture p WHERE p.pharmacy.cip = :cip AND p.account.id = :accountId")
+    Integer findMaxDisplayOrderByPharmacyAndAccount(@Param("cip") String cip, @Param("accountId") UUID accountId);
 } 

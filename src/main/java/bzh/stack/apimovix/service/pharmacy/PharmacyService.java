@@ -115,6 +115,13 @@ public class PharmacyService {
         } else {
             // Filter pictures to keep only those matching the accountId
             pharmacy.getPictures().removeIf(pic -> pic.getAccount() == null || !pic.getAccount().getId().equals(accountId));
+            // Sort pictures by displayOrder (nulls last)
+            pharmacy.getPictures().sort((p1, p2) -> {
+                if (p1.getDisplayOrder() == null && p2.getDisplayOrder() == null) return 0;
+                if (p1.getDisplayOrder() == null) return 1;
+                if (p2.getDisplayOrder() == null) return -1;
+                return p1.getDisplayOrder().compareTo(p2.getDisplayOrder());
+            });
         }
     }
 
@@ -339,15 +346,28 @@ public class PharmacyService {
 
     @Transactional
     public PharmacyPicture createPharmacyPicture(Pharmacy pharmacy, Account account, String base64Image) {
+        return createPharmacyPicture(pharmacy, account, base64Image, null);
+    }
+
+    @Transactional
+    public PharmacyPicture createPharmacyPicture(Pharmacy pharmacy, Account account, String base64Image, Integer displayOrder) {
         String fileName = pictureService.savePharmacyImage(pharmacy, base64Image);
         PharmacyPicture picture = null;
 
         if (fileName != null) {
             try {
+                // Use provided display order or get next available
+                Integer orderToUse = displayOrder;
+                if (orderToUse == null) {
+                    Integer maxOrder = pharmacyPictureRepository.findMaxDisplayOrderByPharmacyAndAccount(pharmacy.getCip(), account.getId());
+                    orderToUse = (maxOrder == null ? 0 : maxOrder) + 1;
+                }
+
                 picture = new PharmacyPicture();
                 picture.setName(fileName);
                 picture.setPharmacy(pharmacy);
                 picture.setAccount(account);
+                picture.setDisplayOrder(orderToUse);
                 pharmacyPictureRepository.save(picture);
 
                 pharmacy.getPictures().add(picture);
@@ -358,6 +378,34 @@ public class PharmacyService {
         }
 
         return picture;
+    }
+
+    @Transactional
+    public PharmacyPicture updatePharmacyPicture(Pharmacy pharmacy, Account account, UUID pictureId, String base64Image, Integer displayOrder) {
+        PharmacyPicture picture = pharmacyPictureRepository.findPicture(pharmacy.getCip(), pictureId, account.getId());
+
+        if (picture == null) {
+            return null;
+        }
+
+        // Update base64 image if provided
+        if (base64Image != null && !base64Image.isEmpty()) {
+            String oldFileName = picture.getName();
+            String newFileName = pictureService.savePharmacyImage(pharmacy, base64Image);
+
+            if (newFileName != null) {
+                picture.setName(newFileName);
+                // Delete old image after successful upload
+                pictureService.deleteImage(oldFileName);
+            }
+        }
+
+        // Update display order if provided
+        if (displayOrder != null) {
+            picture.setDisplayOrder(displayOrder);
+        }
+
+        return pharmacyPictureRepository.save(picture);
     }
 
     @Transactional
