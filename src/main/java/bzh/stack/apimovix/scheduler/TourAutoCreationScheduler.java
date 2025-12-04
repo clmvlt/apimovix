@@ -5,7 +5,6 @@ import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.model.TourConfig;
-import bzh.stack.apimovix.model.Zone;
 import bzh.stack.apimovix.repository.TourConfigRepository;
 import bzh.stack.apimovix.repository.tour.TourRepository;
 import bzh.stack.apimovix.service.ProfileService;
