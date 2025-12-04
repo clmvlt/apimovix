@@ -33,6 +33,9 @@ public class PharmacyInformations {
     @JsonIgnore
     private Pharmacy pharmacy;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "address1")
     private String address1;
 

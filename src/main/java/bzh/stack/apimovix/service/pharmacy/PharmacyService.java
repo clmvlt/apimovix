@@ -468,6 +468,7 @@ public class PharmacyService {
             PharmacyInformations pharmacyInformations = pharmacy.getOrCreatePharmacyInformationsForAccount(account);
 
             // Remplir les données spécifiques au compte (peuvent override les données de pharmacy)
+            pharmacyInformations.setName(pharmacyDTO.getName());
             pharmacyInformations.setAddress1(pharmacyDTO.getAddress1());
             pharmacyInformations.setAddress2(pharmacyDTO.getAddress2());
             pharmacyInformations.setAddress3(pharmacyDTO.getAddress3());

@@ -71,6 +71,11 @@ public class Pharmacy {
     private String lastName;
 
     // Override getters pour utiliser pharmacyInformations si disponible
+    public String getName() {
+        return (pharmacyInformations != null && pharmacyInformations.getName() != null)
+            ? pharmacyInformations.getName() : this.name;
+    }
+
     public String getAddress1() {
         return (pharmacyInformations != null && pharmacyInformations.getAddress1() != null)
             ? pharmacyInformations.getAddress1() : this.address1;

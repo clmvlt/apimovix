@@ -21,6 +21,7 @@ public interface PharmacyInformationsMapper {
 
     @Mapping(target = "cip", ignore = true)
     @Mapping(target = "pharmacy", ignore = true)
+    @Mapping(target = "name", source = "name")
     @Mapping(target = "address1", source = "address1")
     @Mapping(target = "address2", source = "address2")
     @Mapping(target = "address3", source = "address3")
