@@ -1,6 +1,5 @@
 package bzh.stack.apimovix.service.tour;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,7 +39,6 @@ public class TourCommandService {
             return false;
         }
 
-        // Convertir les IDs et valider
         List<UUID> commandUuids = commandIds.getCommandIds().stream()
                 .map(id -> {
                     try {
@@ -56,52 +54,96 @@ public class TourCommandService {
             return false;
         }
 
-        // Utiliser une requête bulk pour récupérer tour et commands en une fois
         Optional<Tour> optTour = tourService.findTour(account, tourId);
         if (optTour.isEmpty()) {
             return false;
         }
         Tour tour = optTour.get();
 
-        // Récupérer les commands à assigner
         List<Command> commandsToUpdate = commandService.findCommandsByIds(account, commandUuids);
         if (commandsToUpdate.isEmpty()) {
             return false;
         }
 
-        // Calculer le dernier tour order une seule fois
-        Integer maxTourOrder = commandRepository.findMaxTourOrderByTourId(tourId);
-        AtomicInteger tourOrderCounter = new AtomicInteger(maxTourOrder != null ? maxTourOrder : 0);
-
-        // Collecter les tours affectés (pour mise à jour des routes)
-        Set<String> affectedTourIds = commandsToUpdate.stream()
+        Set<String> previousTourIds = commandsToUpdate.stream()
                 .map(cmd -> cmd.getTour() != null ? cmd.getTour().getId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        affectedTourIds.add(tourId);
 
-        // Mise à jour des commands en une seule opération
         commandsToUpdate.forEach(command -> {
-            command.setTourOrder(tourOrderCounter.incrementAndGet());
             command.setTour(tour);
+            command.setTourOrder(9999);
         });
 
-        // Une seule sauvegarde pour les commands
         commandRepository.saveAll(commandsToUpdate);
 
-        // Mise à jour asynchrone des routes si possible, sinon en parallèle
-        updateTourRoutes(account, affectedTourIds);
+        entityManager.flush();
+        entityManager.clear();
+
+        Set<String> toursToReorganize = new java.util.HashSet<>(previousTourIds);
+        toursToReorganize.add(tourId);
+
+        for (String affectedTourId : toursToReorganize) {
+            reorganizeTourOrder(account, affectedTourId);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        updateTourRoutes(account, toursToReorganize);
 
         return true;
     }
 
-    private void updateTourRoutes(Account account, Set<String> tourIds) {
+    private void reorganizeTourOrder(Account account, String tourId) {
+        Tour reloadedTour = tourRepository.findTour(account, tourId);
+        if (reloadedTour != null && reloadedTour.getCommands() != null) {
+            List<Command> commands = reloadedTour.getCommands().stream()
+                .filter(cmd -> cmd.getTour() != null && cmd.getTour().getId().equals(tourId))
+                .sorted((c1, c2) -> {
+                    if (c1.getTourOrder() == null) return 1;
+                    if (c2.getTourOrder() == null) return -1;
+                    return c1.getTourOrder().compareTo(c2.getTourOrder());
+                })
+                .collect(Collectors.toList());
+
+            AtomicInteger newOrder = new AtomicInteger(0);
+            commands.forEach(cmd -> cmd.setTourOrder(newOrder.incrementAndGet()));
+
+            if (!commands.isEmpty()) {
+                commandRepository.saveAll(commands);
+            }
+        }
+    }
+
+    public void updateTourRoutes(Account account, Set<String> tourIds) {
         List<Tour> toursToUpdate = tourIds.stream()
                 .map(id -> tourRepository.findTour(account, id))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        // Traitement parallèle des routes pour améliorer les performances
+        // Charger les PharmacyInformationsList et appliquer les PharmacyInformations
+        List<Command> allCommands = toursToUpdate.stream()
+            .flatMap(tour -> tour.getCommands() != null ? tour.getCommands().stream() : java.util.stream.Stream.empty())
+            .collect(Collectors.toList());
+
+        if (!allCommands.isEmpty()) {
+            List<String> pharmacyCips = allCommands.stream()
+                .filter(c -> c.getPharmacy() != null)
+                .map(c -> c.getPharmacy().getCip())
+                .distinct()
+                .collect(Collectors.toList());
+
+            if (!pharmacyCips.isEmpty()) {
+                tourRepository.loadPharmacyInformationsByCips(pharmacyCips);
+                allCommands.forEach(command -> {
+                    if (command.getPharmacy() != null) {
+                        command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+                    }
+                });
+            }
+        }
+
         toursToUpdate.parallelStream().forEach(tour -> {
             Optional<RouteResponseDTO> tourRouteOptional = orsService.calculateTourRoute(tour);
             if (tourRouteOptional.isEmpty()) {
@@ -116,8 +158,40 @@ public class TourCommandService {
             }
         });
 
-        // Une seule sauvegarde pour tous les tours
         tourRepository.saveAll(toursToUpdate);
+    }
+
+    @Transactional
+    public boolean addTourToCommand(Account account, Command command, Tour tour) {
+        if (command == null || tour == null) {
+            return false;
+        }
+
+        String previousTourId = command.getTour() != null ? command.getTour().getId() : null;
+
+        command.setTour(tour);
+        command.setTourOrder(9999);
+        commandRepository.save(command);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Set<String> toursToReorganize = new java.util.HashSet<>();
+        if (previousTourId != null) {
+            toursToReorganize.add(previousTourId);
+        }
+        toursToReorganize.add(tour.getId());
+
+        for (String tourId : toursToReorganize) {
+            reorganizeTourOrder(account, tourId);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        updateTourRoutes(account, toursToReorganize);
+
+        return true;
     }
 
     @Transactional
@@ -147,43 +221,33 @@ public class TourCommandService {
             return false;
         }
 
-        List<Tour> toursToUpdate = new ArrayList<>();
+        Set<String> affectedTourIds = commandsToUpdate.stream()
+                .filter(cmd -> cmd.getTour() != null)
+                .map(cmd -> cmd.getTour().getId())
+                .collect(Collectors.toSet());
+
+        if (affectedTourIds.isEmpty()) {
+            return false;
+        }
 
         commandsToUpdate.forEach(command -> {
-            if (command.getTour() != null) {
-                Tour tourToUpdate = command.getTour();
-                if (!toursToUpdate.contains(tourToUpdate)) {
-                    toursToUpdate.add(tourToUpdate);
-                }
-                command.setTourOrder(null);
-                command.setTour(null);
-            }
+            command.setTourOrder(null);
+            command.setTour(null);
         });
 
-
         commandRepository.saveAll(commandsToUpdate);
-        
+
         entityManager.flush();
         entityManager.clear();
 
-        toursToUpdate.forEach(t -> {
-            Tour reloadedTour = tourRepository.findTour(account, t.getId());
-            if (reloadedTour != null) {
-                Optional<RouteResponseDTO> tourRouteOptional = orsService.calculateTourRoute(reloadedTour);
-                if (tourRouteOptional.isEmpty()) {
-                    t.setGeometry(null);
-                    t.setEstimateKm(0.0);
-                    t.setEstimateMins(0.0);
-                } else {
-                    RouteResponseDTO tourRoute = tourRouteOptional.get();
-                    t.setGeometry(tourRoute.getGeometry());
-                    t.setEstimateKm(tourRoute.getDistance());
-                    t.setEstimateMins(tourRoute.getDuration());
-                }
-            }
+        affectedTourIds.forEach(tourId -> {
+            reorganizeTourOrder(account, tourId);
         });
 
-        tourRepository.saveAll(toursToUpdate);
+        entityManager.flush();
+        entityManager.clear();
+
+        updateTourRoutes(account, affectedTourIds);
 
         return true;
     }

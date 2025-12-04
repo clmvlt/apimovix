@@ -65,6 +65,6 @@ public class PharmacyInfos {
     
     @OneToMany(mappedBy = "pharmacyInfos")
     @JsonManagedReference
-    @org.hibernate.annotations.OrderBy(clause = "display_order ASC NULLS LAST")
+    @jakarta.persistence.OrderBy("displayOrder ASC")
     private List<PharmacyInfosPicture> pictures = new ArrayList<>();
 } 

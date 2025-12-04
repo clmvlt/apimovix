@@ -28,7 +28,7 @@ import bzh.stack.apimovix.mapper.AnomalieMapper;
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.service.AnomalieService;
-import bzh.stack.apimovix.service.PdfGeneratorService;
+import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.util.GLOBAL;
 import bzh.stack.apimovix.util.MAPIR;
 import bzh.stack.apimovix.util.PATTERNS;

@@ -21,7 +21,7 @@ import bzh.stack.apimovix.model.History.HistoryPackageStatus;
     componentModel = "spring",
     unmappedTargetPolicy = ReportingPolicy.IGNORE,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {PackageMapper.class, ProfileMapper.class}
+    uses = {ProfileMapper.class}
 )
 @Component
 public interface PackageMapper {

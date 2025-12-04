@@ -41,4 +41,7 @@ public interface ProfileRepository extends JpaRepository<Profil, UUID> {
 
     @Query("SELECT COUNT(p) FROM Profil p WHERE p.account = :account AND (p.deleted IS NULL OR p.deleted = false)")
     public long countByAccount(@Param("account") Account account);
+
+    @Query("SELECT p FROM Profil p JOIN FETCH p.account WHERE p.account = :account AND LOWER(p.identifiant) = LOWER(:identifiant) AND (p.deleted IS NULL OR p.deleted = false)")
+    public Optional<Profil> findByAccountAndIdentifiant(@Param("account") Account account, @Param("identifiant") String identifiant);
 } 

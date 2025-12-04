@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import bzh.stack.apimovix.dto.command.CommandUpdateTarifDTO;
 import bzh.stack.apimovix.dto.importer.CommandImporterDTO;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
+import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.Profil;
@@ -38,13 +40,12 @@ import bzh.stack.apimovix.service.packageservices.PackageService;
 import bzh.stack.apimovix.service.packageservices.PackageStatusService;
 import bzh.stack.apimovix.service.pharmacy.PharmacyService;
 import bzh.stack.apimovix.service.picture.PictureService;
+import bzh.stack.apimovix.service.tour.TourCommandService;
 import bzh.stack.apimovix.util.GLOBAL;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class CommandService {
     private final CommandRepository commandRepository;
     private final CommandPictureRepository commandPictureRepository;
@@ -56,10 +57,40 @@ public class CommandService {
     private final PackageStatusService packageStatusService;
     private final HistoryPackageStatusService historyPackageStatusService;
     private final AnomalieService anomalieService;
+    private final TourCommandService tourCommandService;
+
+    public CommandService(
+            CommandRepository commandRepository,
+            CommandPictureRepository commandPictureRepository,
+            CommandStatusService commandStatusService,
+            PictureService pictureService,
+            PharmacyService pharmacyService,
+            PackageService packageService,
+            HistoryCommandStatusService historyCommandStatusService,
+            PackageStatusService packageStatusService,
+            HistoryPackageStatusService historyPackageStatusService,
+            AnomalieService anomalieService,
+            @Lazy TourCommandService tourCommandService) {
+        this.commandRepository = commandRepository;
+        this.commandPictureRepository = commandPictureRepository;
+        this.commandStatusService = commandStatusService;
+        this.pictureService = pictureService;
+        this.pharmacyService = pharmacyService;
+        this.packageService = packageService;
+        this.historyCommandStatusService = historyCommandStatusService;
+        this.packageStatusService = packageStatusService;
+        this.historyPackageStatusService = historyPackageStatusService;
+        this.anomalieService = anomalieService;
+        this.tourCommandService = tourCommandService;
+    }
 
     @Transactional(readOnly = true)
     public Optional<Command> findPharmacyCommandByDate(Account account, String cip, LocalDateTime date) {
         Command command = commandRepository.findPharmacyCommandByDate(account, cip, date);
+        if (command != null && command.getPharmacy() != null) {
+            // Charger les PharmacyInformations pour la pharmacy
+            command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+        }
         return Optional.ofNullable(command);
     }
 
@@ -70,7 +101,14 @@ public class CommandService {
 
     @Transactional(readOnly = true)
     public List<Command> findCommandsByIds(Account account, List<UUID> ids) {
-        return commandRepository.findCommandsByIds(account, ids);
+        List<Command> commands = commandRepository.findCommandsByIds(account, ids);
+        // Charger les PharmacyInformations pour chaque pharmacy
+        commands.forEach(command -> {
+            if (command.getPharmacy() != null) {
+                command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+            }
+        });
+        return commands;
     }
 
     @Transactional
@@ -124,11 +162,6 @@ public class CommandService {
         return commandRepository.save(command);
     }
 
-    /**
-     * Mappe un statut de commande vers le statut de package correspondant
-     * @param commandStatusId L'ID du statut de commande
-     * @return L'ID du statut de package correspondant, ou null si aucun mapping n'existe
-     */
     private Integer mapCommandStatusToPackageStatus(Integer commandStatusId) {
         switch (commandStatusId) {
             case 1: // "À enlever"
@@ -154,14 +187,6 @@ public class CommandService {
         }
     }
 
-    /**
-     * Crée automatiquement une anomalie si le statut de commande le nécessite
-     * @param profil Le profil qui effectue l'action
-     * @param command La commande concernée
-     * @param status Le statut de commande appliqué
-     * @param isWeb Si true, ne génère pas d'anomalie
-     * @param comment Commentaire à ajouter à l'anomalie
-     */
     private void createAnomalieIfNeeded(Profil profil, Command command, CommandStatus status, Boolean isWeb, String comment) {
         if (isWeb != null && isWeb) {
             return;
@@ -303,11 +328,70 @@ public class CommandService {
     public List<CommandExpeditionDTO> findExpeditionCommands(Account account, LocalDateTime date) {
         LocalDateTime startDate = date.toLocalDate().atStartOfDay();
         LocalDateTime endDate = startDate.plusDays(1);
-        return commandRepository.findExpeditionCommands(account, startDate, endDate);
+
+        // Charger les entités Command complètes avec leurs pharmacies
+        List<Command> commands = commandRepository.findExpeditionCommandsEntities(account, startDate, endDate);
+
+        // Charger les PharmacyInformations pour chaque pharmacy
+        commands.forEach(command -> {
+            if (command.getPharmacy() != null) {
+                command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+            }
+        });
+
+        // Convertir en DTOs
+        return commands.stream()
+            .map(command -> {
+                // Compter les packages
+                Long packagesNumber = (long) (command.getPackages() != null ? command.getPackages().size() : 0);
+                // Calculer le poids total
+                Double totalWeight = command.getPackages() != null
+                    ? command.getPackages().stream()
+                        .filter(p -> p.getWeight() != null)
+                        .mapToDouble(p -> p.getWeight())
+                        .sum()
+                    : 0.0;
+
+                // Créer le PharmacyDTO avec les données qui incluent maintenant les PharmacyInformations
+                bzh.stack.apimovix.dto.pharmacy.PharmacyDTO pharmacyDTO = null;
+                if (command.getPharmacy() != null) {
+                    pharmacyDTO = new bzh.stack.apimovix.dto.pharmacy.PharmacyDTO(
+                        command.getPharmacy().getCip(),
+                        command.getPharmacy().getName(),
+                        command.getPharmacy().getAddress1(), // Utilise les getters qui appliquent PharmacyInformations
+                        command.getPharmacy().getCity(),
+                        command.getPharmacy().getPostalCode(),
+                        command.getPharmacy().getLatitude(),
+                        command.getPharmacy().getLongitude()
+                    );
+                }
+
+                return new CommandExpeditionDTO(
+                    command.getId(),
+                    command.getCloseDate(),
+                    command.getTourOrder(),
+                    command.getExpDate(),
+                    command.getComment(),
+                    command.getNewPharmacy(),
+                    command.getLatitude(),
+                    command.getLongitude(),
+                    command.getTour(),
+                    packagesNumber,
+                    totalWeight,
+                    pharmacyDTO,
+                    command.getLastHistoryStatus() != null ? command.getLastHistoryStatus().getStatus() : null
+                );
+            })
+            .collect(Collectors.toList());
     }
 
     public Optional<Command> findById(Account account, UUID id) {
-        return Optional.ofNullable(commandRepository.findCommandById(account, id));
+        Command command = commandRepository.findCommandById(account, id);
+        if (command != null && command.getPharmacy() != null) {
+            // Charger les PharmacyInformations pour la pharmacy
+            command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+        }
+        return Optional.ofNullable(command);
     }
 
     @Transactional(readOnly = true)
@@ -380,18 +464,14 @@ public class CommandService {
 
         String commandId = searchDTO.getCommandId();
         
-        // Gestion des dates : si startDate est null, ignorer la recherche par date
         LocalDateTime startDate = searchDTO.getStartDate();
         LocalDateTime endDate = searchDTO.getEndDate();
         
         if (startDate != null && endDate == null) {
-            // Si seulement startDate est fournie, endDate = aujourd'hui
             endDate = LocalDateTime.now().toLocalDate().atTime(23, 59, 59);
         } else if (startDate == null) {
-            // Si startDate est null, ignorer complètement les filtres de date
             endDate = null;
         } else if (endDate != null) {
-            // Si endDate est fournie, s'assurer qu'elle inclut toute la journée
             endDate = endDate.toLocalDate().atTime(23, 59, 59);
         }
 
@@ -432,6 +512,7 @@ public class CommandService {
     @Transactional
     public boolean updateCommandBulk(Profil profil, @Valid CommandUpdateDTO commandUpdateDTO) {
         List<Command> commandsToUpdate = new ArrayList<>();
+        List<Tour> toursToRefresh = new ArrayList<>();
 
         for (String commandId : commandUpdateDTO.getCommandIds()) {
             UUID uuid = UUID.fromString(commandId);
@@ -440,7 +521,12 @@ public class CommandService {
                 Command command = optCommand.get();
                 if (commandUpdateDTO.getExpDate() != null) {
                     command.setExpDate(commandUpdateDTO.getExpDate());
+                    // Track the tour before removing it so we can update its route
+                    if (command.getTour() != null && !toursToRefresh.contains(command.getTour())) {
+                        toursToRefresh.add(command.getTour());
+                    }
                     command.setTour(null);
+                    command.setTourOrder(null);
                 }
                 if (commandUpdateDTO.getComment() != null) {
                     command.setComment(commandUpdateDTO.getComment());
@@ -453,6 +539,15 @@ public class CommandService {
         }
 
         commandRepository.saveAll(commandsToUpdate);
+
+        // Update routes for all affected tours
+        if (!toursToRefresh.isEmpty()) {
+            java.util.Set<String> tourIds = toursToRefresh.stream()
+                .map(Tour::getId)
+                .collect(java.util.stream.Collectors.toSet());
+            tourCommandService.updateTourRoutes(profil.getAccount(), tourIds);
+        }
+
         return true;
     }
 

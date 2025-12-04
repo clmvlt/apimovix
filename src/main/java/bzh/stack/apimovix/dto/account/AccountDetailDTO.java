@@ -40,7 +40,6 @@ public class AccountDetailDTO {
     private Boolean smtpUseSsl;
     private Boolean isScanCIP;
     private Boolean autoSendAnomalieEmails;
-    private Boolean autoCreateTour;
     private String logoUrl;
 
 } 

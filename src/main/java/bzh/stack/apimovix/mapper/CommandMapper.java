@@ -18,7 +18,11 @@ import bzh.stack.apimovix.dto.command.CommandStatusDTO;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.History.HistoryCommandStatus;
 
-@Mapper(componentModel = "spring", uses = {PackageMapper.class, ProfileMapper.class})
+@Mapper(
+    componentModel = "spring",
+    uses = {PackageMapper.class, ProfileMapper.class},
+    unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE
+)
 public interface CommandMapper {
     
     CommandMapper INSTANCE = Mappers.getMapper(CommandMapper.class);
@@ -37,6 +41,7 @@ public interface CommandMapper {
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "pharmacyCommentaire", expression = "java(entity.getPharmacy() != null ? entity.getPharmacy().getCommentaire() : null)")
+    @Mapping(target = "tourColor", source = "tour.color")
     @Named("toDTO")
     CommandDTO toDTO(Command entity);
 
@@ -45,12 +50,15 @@ public interface CommandMapper {
 
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
+    @Mapping(target = "tourColor", source = "tour.color")
+    @Mapping(target = "pharmacyCommentaire", expression = "java(entity.getPharmacy() != null ? entity.getPharmacy().getCommentaire() : null)")
     CommandDetailDTO toDetailDTO(Command entity);
 
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
     @Mapping(target = "packagesNumber", expression = "java(entity.getPackages() != null ? entity.getPackages().size() : 0)")
     @Mapping(target = "pharmacyCommentaire", expression = "java(entity.getPharmacy() != null ? entity.getPharmacy().getCommentaire() : null)")
+    @Mapping(target = "totalWeight", expression = "java(entity.getPackages() != null ? entity.getPackages().stream().map(p -> p.getWeight() != null ? p.getWeight() : 0.0).reduce(0.0, Double::sum).floatValue() : 0.0f)")
     CommandExpeditionDTO toExpeditionDTO(Command entity);
     
     default List<CommandExpeditionDTO> toExpeditionDTOList(List<Command> entities) {

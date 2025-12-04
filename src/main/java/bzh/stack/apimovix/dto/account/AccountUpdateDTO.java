@@ -39,8 +39,6 @@ public class AccountUpdateDTO {
 
     private Boolean autoSendAnomalieEmails;
 
-    private Boolean autoCreateTour;
-
     // Logo en base64
     private String logo;
 

@@ -21,5 +21,8 @@ public interface ZoneRepository extends JpaRepository<Zone, UUID> {
 
     @Query("SELECT DISTINCT z FROM Zone z WHERE z.account = :account ORDER BY z.name")
     public List<Zone> findZones(@Param("account") Account account);
+
+    @Query("SELECT z FROM Zone z WHERE z.account = :account AND z.name = :name")
+    public Optional<Zone> findByAccountAndName(@Param("account") Account account, @Param("name") String name);
 }
 

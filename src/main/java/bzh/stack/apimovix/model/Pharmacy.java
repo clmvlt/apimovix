@@ -164,7 +164,7 @@ public class Pharmacy {
 
     @OneToMany(mappedBy = "pharmacy", fetch = FetchType.EAGER)
     @JsonManagedReference
-    @org.hibernate.annotations.OrderBy(clause = "display_order ASC NULLS LAST")
+    @jakarta.persistence.OrderBy("displayOrder ASC")
     private List<PharmacyPicture> pictures = new ArrayList<>();
 
     @OneToMany(mappedBy = "pharmacy")

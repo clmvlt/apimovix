@@ -108,10 +108,6 @@ public class Account {
     @Column(name = "auto_send_anomalie_emails", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean autoSendAnomalieEmails = false;
 
-    @Column(name = "auto_create_tour", columnDefinition = "BOOLEAN DEFAULT FALSE")
-    private Boolean autoCreateTour = false;
-
-
     @OneToMany(mappedBy = "account")
     @JsonBackReference
     private List<Profil> profils = new ArrayList<>();

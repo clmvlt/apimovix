@@ -18,12 +18,32 @@ import bzh.stack.apimovix.model.History.HistoryCommandStatus;
 @Repository
 public interface CommandRepository extends JpaRepository<Command, UUID> {
 
-    @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account AND (c.lastHistoryStatus IS NULL OR c.lastHistoryStatus.status.id = 1) AND DATE(c.expDate) = DATE(:date) ORDER BY c.expDate DESC LIMIT 1")
+    @Query("SELECT c FROM Command c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "WHERE c.pharmacy.cip = :cip AND c.sender.account = :account " +
+           "AND (c.lastHistoryStatus IS NULL OR c.lastHistoryStatus.status.id = 1) " +
+           "AND DATE(c.expDate) = DATE(:date) " +
+           "ORDER BY c.expDate DESC LIMIT 1")
     public Command findPharmacyCommandByDate(@Param("account") Account account, @Param("cip") String cip, @Param("date") LocalDateTime date);
 
 
-    @Query("SELECT DISTINCT c FROM Command c LEFT JOIN FETCH c.tour t WHERE c.id IN :ids AND c.sender.account = :account")
+    @Query("SELECT DISTINCT c FROM Command c " +
+           "LEFT JOIN FETCH c.tour t " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "WHERE c.id IN :ids AND c.sender.account = :account")
     public List<Command> findCommandsByIds(@Param("account") Account account, @Param("ids") List<UUID> ids);
+
+    @Query("SELECT c FROM Command c " +
+           "LEFT JOIN FETCH c.tour t " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "LEFT JOIN FETCH c.lastHistoryStatus " +
+           "WHERE c.sender.account = :account " +
+           "AND c.expDate >= :startDate AND c.expDate < :endDate " +
+           "ORDER BY COALESCE(c.tour.id, ''), c.expDate DESC")
+    public List<Command> findExpeditionCommandsEntities(@Param("account") Account account, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT new bzh.stack.apimovix.dto.command.CommandExpeditionDTO(" +
            "c.id, " +
@@ -46,7 +66,10 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "ORDER BY COALESCE(c.tour.id, ''), c.expDate DESC")
     public List<CommandExpeditionDTO> findExpeditionCommands(@Param("account") Account account, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    @Query("SELECT c FROM Command c WHERE c.id = :id AND c.sender.account = :account")
+    @Query("SELECT c FROM Command c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "WHERE c.id = :id AND c.sender.account = :account")
     public Command findCommandById(Account account, UUID id);
 
     @Query("SELECT c FROM Command c WHERE c.pharmacy.cip = :cip AND c.sender.account = :account AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND c.latitude != 0 AND c.longitude != 0 ORDER BY c.expDate DESC LIMIT 5")

@@ -17,7 +17,7 @@ import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
 import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.service.ImporterService;
-import bzh.stack.apimovix.service.PdfGeneratorService;
+import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.packageservices.PackageService;
 import bzh.stack.apimovix.util.GLOBAL;
 import bzh.stack.apimovix.util.MAPIR;

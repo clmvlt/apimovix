@@ -19,7 +19,8 @@
       "Bash(echo:*)",
       "Bash(timeout 10 sleep:*)",
       "Bash(timeout 15 sleep:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(mvn clean compile:*)"
     ],
     "deny": [],
     "ask": []

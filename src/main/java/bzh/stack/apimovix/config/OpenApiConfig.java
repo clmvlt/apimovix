@@ -3,12 +3,15 @@ package bzh.stack.apimovix.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springdoc.core.models.GroupedOpenApi;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import java.util.HashMap;
 
 @Configuration
 public class OpenApiConfig {
@@ -57,5 +60,40 @@ public class OpenApiConfig {
                 .addServersItem(new Server().url(serverUrl).description("API Server"))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .schemaRequirement("bearerAuth", securityScheme);
+    }
+
+    @Bean
+    public GroupedOpenApi publicApi() {
+        boolean isProduction = serverAddress.contains("api.movix.fr");
+
+        if (isProduction) {
+            // En production (api.movix.fr), afficher uniquement le controller Importer
+            return GroupedOpenApi.builder()
+                    .group("public")
+                    .pathsToMatch("/**")
+                    .packagesToScan("bzh.stack.apimovix.controller")
+                    .addOpenApiCustomizer(openApi -> {
+                        // Filtrer les paths pour ne garder que ceux du controller Importer
+                        openApi.getPaths().entrySet().removeIf(entry ->
+                            !entry.getKey().startsWith("/command/send") &&
+                            !entry.getKey().startsWith("/package/getLabel")
+                        );
+
+                        // Masquer tous les schémas (DTOs) en production
+                        if (openApi.getComponents() != null) {
+                            openApi.setComponents(new Components()
+                                .securitySchemes(openApi.getComponents().getSecuritySchemes())
+                                .schemas(new HashMap<>()) // Vider tous les schémas
+                            );
+                        }
+                    })
+                    .build();
+        } else {
+            // En développement, afficher tous les controllers
+            return GroupedOpenApi.builder()
+                    .group("public")
+                    .pathsToMatch("/**")
+                    .build();
+        }
     }
 } 

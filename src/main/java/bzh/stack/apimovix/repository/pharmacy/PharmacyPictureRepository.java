@@ -16,7 +16,7 @@ public interface PharmacyPictureRepository extends JpaRepository<PharmacyPicture
     @Query("SELECT p FROM PharmacyPicture p WHERE p.pharmacy.cip = :cip AND p.id = :id AND p.account.id = :accountId")
     PharmacyPicture findPicture(@Param("cip") String cip, @Param("id") UUID id, @Param("accountId") UUID accountId);
 
-    @Query("SELECT p FROM PharmacyPicture p WHERE p.pharmacy.cip = :cip AND p.account.id = :accountId")
+    @Query("SELECT p FROM PharmacyPicture p WHERE p.pharmacy.cip = :cip AND p.account.id = :accountId ORDER BY p.displayOrder ASC")
     List<PharmacyPicture> findPicturesByPharmacyAndAccount(@Param("cip") String cip, @Param("accountId") UUID accountId);
 
     List<PharmacyPicture> findByCreatedAtBefore(LocalDateTime cutoffDate);

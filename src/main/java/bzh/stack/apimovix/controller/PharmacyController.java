@@ -33,6 +33,7 @@ import bzh.stack.apimovix.mapper.PharmacyMapper;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Picture.PharmacyPicture;
+import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.pharmacy.PharmacyService;
 import bzh.stack.apimovix.service.tour.TourService;
 import bzh.stack.apimovix.util.GLOBAL;
@@ -62,7 +63,7 @@ public class PharmacyController {
     private final PharmacyService pharmacyService;
     private final TourService tourService;
     private final PharmacyMapper pharmacyMapper;
-    private final bzh.stack.apimovix.service.PdfGeneratorService pdfGeneratorService;
+    private final PdfGeneratorService pdfGeneratorService;
 
     @GetMapping
     @Operation(summary = "Get all pharmacies", description = "Retrieves a list of all pharmacies belonging to the authenticated account", responses = {

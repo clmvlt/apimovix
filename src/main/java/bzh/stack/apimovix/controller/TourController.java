@@ -37,7 +37,7 @@ import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Tarif;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.model.History.HistoryTourStatus;
-import bzh.stack.apimovix.service.PdfGeneratorService;
+import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.TarifService;
 import bzh.stack.apimovix.service.tour.TourService;
 import bzh.stack.apimovix.util.GLOBAL;

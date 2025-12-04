@@ -14,7 +14,11 @@ import bzh.stack.apimovix.model.Tour;
 
 @Repository
 public interface TourRepository extends JpaRepository<Tour, String> {
-    @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.initialDate = :date AND t.account = :account ORDER BY t.name, c.tourOrder")
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "WHERE t.initialDate = :date AND t.account = :account " +
+           "ORDER BY t.name, c.tourOrder")
     List<Tour> findByDate(@Param("account") Account account, @Param("date") LocalDate date);
 
     @Query("SELECT DISTINCT t FROM Tour t " +
@@ -24,30 +28,58 @@ public interface TourRepository extends JpaRepository<Tour, String> {
            "ORDER BY t.name")
     List<Tour> findToursOptimizedByDate(@Param("account") Account account, @Param("date") LocalDate date);
 
-    @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.initialDate BETWEEN :startDate AND :endDate AND t.account = :account ORDER BY t.initialDate, t.name, c.tourOrder")
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "WHERE t.initialDate BETWEEN :startDate AND :endDate AND t.account = :account " +
+           "ORDER BY t.initialDate, t.name, c.tourOrder")
     List<Tour> findByDateRange(@Param("account") Account account, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT t FROM Tour t  LEFT JOIN FETCH t.commands c WHERE t.profil = :profil AND t.account = :account AND t.lastHistoryStatus.status.id IN (1, 2, 3) ORDER BY t.name, t.initialDate, c.tourOrder")
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "WHERE t.profil = :profil AND t.account = :account AND t.lastHistoryStatus.status.id IN (1, 2, 3) " +
+           "ORDER BY t.name, t.initialDate, c.tourOrder")
     List<Tour> findByProfile(@Param("account") Account account, @Param("profil") Profil profil);
 
-    @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.id = :id AND t.account = :account ORDER BY t.name, c.tourOrder")
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "WHERE t.id = :id AND t.account = :account " +
+           "ORDER BY t.name, c.tourOrder")
     Tour findTour(@Param("account") Account account, @Param("id") String id);
 
     @Query("SELECT DISTINCT t FROM Tour t " +
            "LEFT JOIN FETCH t.commands c " +
            "LEFT JOIN FETCH c.sender s " +
            "LEFT JOIN FETCH s.account " +
-           "LEFT JOIN FETCH c.pharmacy " +
+           "LEFT JOIN FETCH c.pharmacy p " +
            "WHERE t.id = :id AND t.account = :account")
     Tour findTourForTarif(@Param("account") Account account, @Param("id") String id);
 
-    @Query("SELECT t FROM Tour t LEFT JOIN FETCH t.commands c WHERE t.account = :account AND t.id IN :tourIds ORDER BY t.name, c.tourOrder")
+    @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.commands c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "WHERE t.account = :account AND t.id IN :tourIds " +
+           "ORDER BY t.name, c.tourOrder")
     List<Tour> findAllByIdIn(@Param("account") Account account, @Param("tourIds") List<String> tourIds);
 
     @Query("SELECT c FROM Command c " +
-           "LEFT JOIN FETCH c.pharmacy " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
            "LEFT JOIN FETCH c.lastHistoryStatus " +
            "WHERE c.tour.id IN :tourIds AND c.tour.account = :account " +
            "ORDER BY c.tour.id, c.tourOrder")
     List<bzh.stack.apimovix.model.Command> findCommandsByTourIds(@Param("account") Account account, @Param("tourIds") List<String> tourIds);
+
+    @Query("SELECT DISTINCT p FROM Pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "WHERE p.cip IN :cips")
+    List<bzh.stack.apimovix.model.Pharmacy> loadPharmacyInformationsByCips(@Param("cips") List<String> cips);
+
+    /**
+     * Check if a tour already exists for a given account, name and date
+     * Used by scheduler to prevent duplicate tour creation
+     */
+    boolean existsByAccountAndNameAndInitialDate(Account account, String name, LocalDate initialDate);
 }

@@ -34,6 +34,7 @@ import bzh.stack.apimovix.repository.anomalie.TypeAnomalieRepository;
 import bzh.stack.apimovix.model.Notification.NotificationType;
 import bzh.stack.apimovix.service.packageservices.PackageService;
 import bzh.stack.apimovix.service.pharmacy.PharmacyService;
+import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.picture.PictureService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

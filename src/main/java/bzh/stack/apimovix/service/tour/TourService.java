@@ -10,12 +10,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import bzh.stack.apimovix.dto.command.CommandUpdateOrderDTO;
 import bzh.stack.apimovix.dto.command.CommandValidateLoadingDTO;
-import bzh.stack.apimovix.dto.ors.RouteResponseDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.dto.tour.PharmacyOrderStatsDTO;
 import bzh.stack.apimovix.dto.tour.TourCreateDTO;
@@ -59,6 +59,7 @@ public class TourService {
     private final ORSService orsService;
     private final TarifService tarifService;
     private final ZoneRepository zoneRepository;
+    private final TourCommandService tourCommandService;
 
     public TourService(
             TourMapper tourMapper,
@@ -71,7 +72,8 @@ public class TourService {
             HistoryTourStatusRepository historyTourStatusRepository,
             ORSService orsService,
             TarifService tarifService,
-            ZoneRepository zoneRepository) {
+            ZoneRepository zoneRepository,
+            @Lazy TourCommandService tourCommandService) {
         this.tourMapper = tourMapper;
         this.tourRepository = tourRepository;
         this.historyTourStatusService = historyTourStatusService;
@@ -83,47 +85,97 @@ public class TourService {
         this.orsService = orsService;
         this.tarifService = tarifService;
         this.zoneRepository = zoneRepository;
+        this.tourCommandService = tourCommandService;
+    }
+
+    /**
+     * Charge les PharmacyInformationsList et applique les PharmacyInformations pour un compte donné
+     */
+    private void loadPharmacyInformationsForCommands(List<Command> commands, UUID accountId) {
+        if (commands == null || commands.isEmpty()) {
+            return;
+        }
+
+        // Récupérer tous les CIPs des pharmacies
+        List<String> pharmacyCips = commands.stream()
+            .filter(c -> c.getPharmacy() != null)
+            .map(c -> c.getPharmacy().getCip())
+            .distinct()
+            .collect(Collectors.toList());
+
+        if (!pharmacyCips.isEmpty()) {
+            // Charger les PharmacyInformationsList pour toutes les pharmacies en une seule requête
+            tourRepository.loadPharmacyInformationsByCips(pharmacyCips);
+
+            // Appliquer les PharmacyInformations pour ce compte
+            commands.forEach(command -> {
+                if (command.getPharmacy() != null) {
+                    command.getPharmacy().loadPharmacyInformationsForAccount(accountId);
+                }
+            });
+        }
     }
 
     @Transactional(readOnly = true)
     public Optional<Tour> findTour(Account account, String tourId) {
-        return Optional.ofNullable(tourRepository.findTour(account, tourId));
+        Tour tour = tourRepository.findTour(account, tourId);
+        if (tour != null && tour.getCommands() != null) {
+            loadPharmacyInformationsForCommands(tour.getCommands(), account.getId());
+        }
+        return Optional.ofNullable(tour);
     }
 
     @Transactional(readOnly = true)
     public Optional<Tour> findTourForTarif(Account account, String tourId) {
-        return Optional.ofNullable(tourRepository.findTourForTarif(account, tourId));
+        Tour tour = tourRepository.findTourForTarif(account, tourId);
+        if (tour != null && tour.getCommands() != null) {
+            loadPharmacyInformationsForCommands(tour.getCommands(), account.getId());
+        }
+        return Optional.ofNullable(tour);
     }
 
     @Transactional(readOnly = true)
     public List<Tour> findTours(Account account, LocalDate date) {
         // Charger les tours sans les commands pour éviter le produit cartésien
         List<Tour> tours = tourRepository.findToursOptimizedByDate(account, date);
-        
+
         if (!tours.isEmpty()) {
             // Charger les commands séparément pour tous les tours
             List<String> tourIds = tours.stream().map(Tour::getId).collect(java.util.stream.Collectors.toList());
             List<bzh.stack.apimovix.model.Command> commands = tourRepository.findCommandsByTourIds(account, tourIds);
-            
+
+            // Charger les PharmacyInformations pour chaque pharmacy dans les commands
+            commands.forEach(command -> {
+                if (command.getPharmacy() != null) {
+                    command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+                }
+            });
+
             // Grouper les commands par tour ID
-            java.util.Map<String, List<bzh.stack.apimovix.model.Command>> commandsByTourId = 
+            java.util.Map<String, List<bzh.stack.apimovix.model.Command>> commandsByTourId =
                 commands.stream().collect(java.util.stream.Collectors.groupingBy(
                     command -> command.getTour().getId()
                 ));
-            
+
             // Assigner les commands aux tours
             tours.forEach(tour -> {
                 List<bzh.stack.apimovix.model.Command> tourCommands = commandsByTourId.getOrDefault(tour.getId(), new java.util.ArrayList<>());
                 tour.setCommands(tourCommands);
             });
         }
-        
+
         return tours;
     }
 
     @Transactional(readOnly = true)
     public List<Tour> findToursByDateRange(Account account, LocalDate startDate, LocalDate endDate) {
-        return tourRepository.findByDateRange(account, startDate, endDate);
+        List<Tour> tours = tourRepository.findByDateRange(account, startDate, endDate);
+        // Charger les PharmacyInformations pour toutes les commands de tous les tours
+        List<Command> allCommands = tours.stream()
+            .flatMap(tour -> tour.getCommands() != null ? tour.getCommands().stream() : java.util.stream.Stream.empty())
+            .collect(Collectors.toList());
+        loadPharmacyInformationsForCommands(allCommands, account.getId());
+        return tours;
     }
 
     @Transactional
@@ -253,7 +305,13 @@ public class TourService {
 
     @Transactional(readOnly = true)
     public List<Tour> findToursByProfile(Account account, Profil profil) {
-        return tourRepository.findByProfile(account, profil);
+        List<Tour> tours = tourRepository.findByProfile(account, profil);
+        // Charger les PharmacyInformations pour toutes les commands de tous les tours
+        List<Command> allCommands = tours.stream()
+            .flatMap(tour -> tour.getCommands() != null ? tour.getCommands().stream() : java.util.stream.Stream.empty())
+            .collect(Collectors.toList());
+        loadPharmacyInformationsForCommands(allCommands, account.getId());
+        return tours;
     }
 
     @Transactional(readOnly = true)
@@ -355,45 +413,28 @@ public class TourService {
     @Transactional
     public boolean updateTourOrder(Account account, TourUpdateOrderDTO tourUpdateOrderDTO) {
         // Collecter toutes les tournées affectées
-        List<Tour> toursToUpdate = new ArrayList<>();
-        
+        java.util.Set<String> tourIdsToUpdate = new java.util.HashSet<>();
+
         for (CommandUpdateOrderDTO commandUpdateOrderDTO : tourUpdateOrderDTO.getCommands()) {
             Optional<Command> optCommand = commandService.findById(account, commandUpdateOrderDTO.getCommandId());
             if (optCommand.isPresent()) {
                 Command command = optCommand.get();
                 command.setTourOrder(commandUpdateOrderDTO.getTourOrder());
                 commandService.save(command);
-                
-                // Ajouter la tournée à la liste des tournées à mettre à jour
-                if (command.getTour() != null && !toursToUpdate.contains(command.getTour())) {
-                    toursToUpdate.add(command.getTour());
+
+                // Ajouter l'ID de la tournée à la liste des tournées à mettre à jour
+                if (command.getTour() != null) {
+                    tourIdsToUpdate.add(command.getTour().getId());
                 }
             } else {
                 return false;
             }
         }
-        
-        // Recalculer les routes pour toutes les tournées affectées APRÈS la sauvegarde
-        for (Tour tour : toursToUpdate) {
-            // Recharger la tournée depuis la base de données pour avoir les données à jour
-            Tour reloadedTour = tourRepository.findTour(account, tour.getId());
-            if (reloadedTour != null) {
-                Optional<RouteResponseDTO> tourRouteOptional = orsService.calculateTourRoute(reloadedTour);
-                if (tourRouteOptional.isEmpty()) {
-                    tour.setGeometry(null);
-                    tour.setEstimateKm(0.0);
-                    tour.setEstimateMins(0.0);
-                } else {
-                    RouteResponseDTO tourRoute = tourRouteOptional.get();
-                    tour.setGeometry(tourRoute.getGeometry());
-                    tour.setEstimateKm(tourRoute.getDistance());
-                    tour.setEstimateMins(tourRoute.getDuration());
-                }
-            }
+
+        // Recalculer les routes pour toutes les tournées affectées en utilisant TourCommandService
+        if (!tourIdsToUpdate.isEmpty()) {
+            tourCommandService.updateTourRoutes(account, tourIdsToUpdate);
         }
-        
-        // Sauvegarder toutes les tournées mises à jour
-        tourRepository.saveAll(toursToUpdate);
 
         return true;
     }
@@ -403,6 +444,7 @@ public class TourService {
         Tour tour = tourMapper.toCreateEntity(tourCreateDTO);
         tour.setId(generateNewId());
         tour.setAccount(profil.getAccount());
+        tour.setProfil(profil);
 
         // Gérer la zone si fournie
         if (tourCreateDTO.getZoneId() != null) {
@@ -486,7 +528,9 @@ public class TourService {
     public List<PharmacyOrderStatsDTO> getPharmacyOrderStats(Account account, LocalDate startDate, LocalDate endDate) {
         List<Tour> tours = findToursByDateRange(account, startDate, endDate);
         List<Tarif> tarifs = tarifService.findTarifsByAccount(account);
-        
+
+        // Charger les PharmacyInformations pour chaque pharmacy dans les commands (déjà fait dans findToursByDateRange)
+
         return tours.stream()
                 .flatMap(tour -> tour.getCommands().stream())
                 .filter(command -> command.getPharmacy() != null)
@@ -558,58 +602,5 @@ public class TourService {
                 .min((t1, t2) -> Double.compare(t1.getKmMax(), t2.getKmMax()));
 
         return matchingTarif.map(Tarif::getPrixEuro).orElse(0.0);
-    }
-
-    /**
-     * Duplique les tours d'une date donnée vers une nouvelle date pour un compte
-     * @param account Le compte pour lequel dupliquer les tours
-     * @param sourceDate La date source dont les tours doivent être dupliqués
-     * @param targetDate La date cible pour les nouveaux tours
-     * @param profil Le profil qui crée les tours (pour l'historique)
-     * @return Le nombre de tours dupliqués
-     */
-    @Transactional
-    public int duplicateToursFromDate(Account account, LocalDate sourceDate, LocalDate targetDate, Profil profil) {
-        // Vérifier si des tours existent déjà pour la date cible
-        List<Tour> existingTargetTours = findTours(account, targetDate);
-        if (!existingTargetTours.isEmpty()) {
-            // Des tours existent déjà pour cette date, ne pas créer de doublons
-            return 0;
-        }
-
-        // Récupérer les tours de la date source
-        List<Tour> sourceTours = findTours(account, sourceDate);
-
-        if (sourceTours.isEmpty()) {
-            return 0;
-        }
-
-        int duplicatedCount = 0;
-
-        for (Tour sourceTour : sourceTours) {
-            // Créer un nouveau DTO avec les mêmes paramètres
-            TourCreateDTO tourCreateDTO = new TourCreateDTO();
-            tourCreateDTO.setName(sourceTour.getName());
-            tourCreateDTO.setColor(sourceTour.getColor());
-            tourCreateDTO.setInitialDate(targetDate);
-
-            // Copier la zone si elle existe
-            if (sourceTour.getZone() != null) {
-                tourCreateDTO.setZoneId(sourceTour.getZone().getId());
-            }
-
-            // Créer le nouveau tour
-            Tour newTour = createTour(profil, tourCreateDTO);
-
-            // Si le tour source avait un profil assigné, l'assigner au nouveau tour
-            if (sourceTour.getProfil() != null) {
-                newTour.setProfil(sourceTour.getProfil());
-                tourRepository.save(newTour);
-            }
-
-            duplicatedCount++;
-        }
-
-        return duplicatedCount;
     }
 }
