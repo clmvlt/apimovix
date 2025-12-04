@@ -21,7 +21,8 @@
       "Bash(timeout 15 sleep:*)",
       "Bash(tasklist:*)",
       "Bash(mvn clean compile:*)",
-      "Bash(mvn compile:*)"
+      "Bash(mvn compile:*)",
+      "Bash(where mvn:*)"
     ],
     "deny": [],
     "ask": []

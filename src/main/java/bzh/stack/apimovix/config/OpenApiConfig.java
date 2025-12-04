@@ -8,10 +8,12 @@ import org.springdoc.core.models.GroupedOpenApi;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 public class OpenApiConfig {
@@ -79,11 +81,40 @@ public class OpenApiConfig {
                             !entry.getKey().startsWith("/package/getLabel")
                         );
 
-                        // Masquer tous les schémas (DTOs) en production
-                        if (openApi.getComponents() != null) {
+                        // Masquer tous les tags/sections sauf "Importer"
+                        if (openApi.getTags() != null) {
+                            openApi.getTags().removeIf(tag -> !"Importer".equals(tag.getName()));
+                        }
+
+                        // Conserver uniquement les schémas (DTOs) utilisés par le controller Importer
+                        if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
+                            @SuppressWarnings("rawtypes")
+                            Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+                            @SuppressWarnings("rawtypes")
+                            Map<String, Schema> importerSchemas = new HashMap<>();
+
+                            // Liste des schémas utilisés par le controller Importer
+                            String[] allowedSchemas = {
+                                "SendCommandRequestDTO",
+                                "SendCommandResponseDTO",
+                                "SenderDTO",
+                                "CommandImporterDTO",
+                                "PharmacyCreateDTO",
+                                "PackageDTO",
+                                "PackageStatusDTO",
+                                "ProfilDTO"
+                            };
+
+                            // Conserver uniquement les schémas autorisés
+                            for (String schemaName : allowedSchemas) {
+                                if (schemas.containsKey(schemaName)) {
+                                    importerSchemas.put(schemaName, schemas.get(schemaName));
+                                }
+                            }
+
                             openApi.setComponents(new Components()
                                 .securitySchemes(openApi.getComponents().getSecuritySchemes())
-                                .schemas(new HashMap<>()) // Vider tous les schémas
+                                .schemas(importerSchemas)
                             );
                         }
                     })
