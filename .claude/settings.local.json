@@ -22,7 +22,10 @@
       "Bash(tasklist:*)",
       "Bash(mvn clean compile:*)",
       "Bash(mvn compile:*)",
-      "Bash(where mvn:*)"
+      "Bash(where mvn:*)",
+      "Bash(for file in repository/ProfileCreationTokenRepository.java service/ProfileCreationTokenService.java mapper/ProfileCreationTokenMapper.java controller/ProfileCreationTokenController.java dto/token/ProfileCreationTokenDTO.java dto/token/ProfileCreationTokenCreateDTO.java)",
+      "Bash(do sed -i 's/TokenCreationProfil/ProfileCreationToken/g' \"$file\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

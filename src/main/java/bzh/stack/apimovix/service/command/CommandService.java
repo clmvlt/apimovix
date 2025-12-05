@@ -123,7 +123,8 @@ public class CommandService {
                     PackageEntity newPackage = packageService.createPackage(
                             command,
                             packageDTO,
-                            commandDTO.getNum_transport());
+                            commandDTO.getNum_transport(),
+                        packageDTO.getId());
                     packageDTO.setBarcode(newPackage.getBarcode());
                     packageDTO.setCNumTransport(newPackage.getCNumTransport());
                     return newPackage;

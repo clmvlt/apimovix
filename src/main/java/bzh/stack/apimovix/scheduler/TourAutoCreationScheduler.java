@@ -139,8 +139,8 @@ public class TourAutoCreationScheduler {
                 config.getZone().getName(), config.getTourName());
         }
 
-        // Créer la tournée via le service
-        Tour createdTour = tourService.createTour(profil, tourCreateDTO);
+        // Créer la tournée via le service avec assignation automatique du profil
+        Tour createdTour = tourService.createTour(profil, tourCreateDTO, true);
 
         log.debug("Tournée créée - ID: {}, Nom: {}, Date: {}, Compte: {}, Profil: {}, Zone: {}",
             createdTour.getId(), createdTour.getName(), date, account.getSociete(),

@@ -39,7 +39,7 @@ public class PackageService {
         for (int i = 0; i < 12; i++) {
             barcode.append(random.nextInt(10));
         }
-        
+
         int sum = 0;
         for (int i = 0; i < 12; i++) {
             int digit = Character.getNumericValue(barcode.charAt(i));
@@ -47,13 +47,21 @@ public class PackageService {
         }
         int checkDigit = (10 - (sum % 10)) % 10;
         barcode.append(checkDigit);
-        
+
         return barcode.toString();
     }
 
     @Transactional(readOnly = true)
-    public String generateNewBarcode(String base) {
+    public String generateNewBarcode(String base, String forceBarcode) {
         String barcode;
+
+        if (forceBarcode != null && !forceBarcode.isEmpty()) {
+            barcode = forceBarcode;
+            if (packageRepository.findById(barcode).orElse(null) == null) {
+                return barcode;
+            }
+        }
+
         do {
             barcode = base + generateBarcode();
         } while (packageRepository.findById(barcode).orElse(null) != null);
@@ -67,27 +75,30 @@ public class PackageService {
     }
 
     @Transactional
-    public PackageEntity createPackage(Command command, @Valid PackageDTO packageDTO, String numTransport) {
+    public PackageEntity createPackage(Command command, @Valid PackageDTO packageDTO, String numTransport,
+            String forceBarcode) {
         PackageEntity packageEntity;
         if (packageDTO != null) {
             packageEntity = packageMapper.toEntity(packageDTO);
         } else {
             packageEntity = new PackageEntity();
         }
-        String zoneName = (command.getPharmacy().getZone() != null) 
-            ? command.getPharmacy().getZone().getName() 
-            : null;
+        String zoneName = (command.getPharmacy().getZone() != null)
+                ? command.getPharmacy().getZone().getName()
+                : null;
         packageEntity.setZoneName(zoneName);
         packageEntity.setCommand(command);
         packageEntity.setCNumTransport(numTransport);
-        String newBarcode = generateNewBarcode(command.getPharmacy().getPostalCode());
+
+        String newBarcode = generateNewBarcode(command.getPharmacy().getPostalCode(), forceBarcode);
         packageEntity.setBarcode(newBarcode);
 
         packageEntity = packageRepository.save(packageEntity);
 
         Optional<PackageStatus> optStatus = packageStatusService.findPackageStatus(1);
         if (optStatus.isPresent()) {
-            HistoryPackageStatus hs = historyPackageStatusService.createHistoryPackageStatus(packageEntity, null, optStatus.get());
+            HistoryPackageStatus hs = historyPackageStatusService.createHistoryPackageStatus(packageEntity, null,
+                    optStatus.get());
             packageEntity.setLastHistoryStatus(hs);
         }
 
@@ -97,7 +108,7 @@ public class PackageService {
     @Transactional(readOnly = true)
     public Optional<PackageEntity> findPackage(String barcode) {
         PackageEntity packageEntity = packageRepository.findPackage(barcode);
-        
+
         if (packageEntity != null) {
             packageEntity.getCommand();
             return Optional.of(packageEntity);
@@ -111,34 +122,37 @@ public class PackageService {
 
     @Transactional
     public PackageEntity updatePackageStatus(Profil profil, PackageStatus status, PackageEntity packageEntity) {
-        HistoryPackageStatus historyPackageStatus = historyPackageStatusService.createHistoryPackageStatus(packageEntity, profil, status);
+        HistoryPackageStatus historyPackageStatus = historyPackageStatusService
+                .createHistoryPackageStatus(packageEntity, profil, status);
         packageEntity.setLastHistoryStatus(historyPackageStatus);
         return packageRepository.save(packageEntity);
     }
 
     @Transactional
     public boolean updatePackageStatusBulk(Profil profil, PackageUpdateStatusDTO packageUpdateStatusDTO) {
-        Optional<PackageStatus> optStatus = packageStatusService.findPackageStatus(packageUpdateStatusDTO.getStatusId());
+        Optional<PackageStatus> optStatus = packageStatusService
+                .findPackageStatus(packageUpdateStatusDTO.getStatusId());
         if (optStatus.isEmpty()) {
             return false;
         }
         PackageStatus status = optStatus.get();
 
-        List<PackageEntity> packages = packageRepository.findAllByIdIn(profil.getAccount(), packageUpdateStatusDTO.getPackageBarcodes());
+        List<PackageEntity> packages = packageRepository.findAllByIdIn(profil.getAccount(),
+                packageUpdateStatusDTO.getPackageBarcodes());
         if (packages.size() != packageUpdateStatusDTO.getPackageBarcodes().size()) {
             return false;
         }
 
         List<HistoryPackageStatus> historyStatuses = packages.stream()
-            .map(packageEntity -> historyPackageStatusService.createHistoryPackageStatus(packageEntity, profil, status))
-            .collect(Collectors.toList());
+                .map(packageEntity -> historyPackageStatusService.createHistoryPackageStatus(packageEntity, profil,
+                        status))
+                .collect(Collectors.toList());
 
-            packages.forEach(packageEntity -> packageEntity.setLastHistoryStatus(
-            historyStatuses.stream()
-                .filter(hs -> hs.getPackageEntity().getBarcode().equals(packageEntity.getBarcode()))
-                .findFirst()
-                .orElse(null)
-        ));
+        packages.forEach(packageEntity -> packageEntity.setLastHistoryStatus(
+                historyStatuses.stream()
+                        .filter(hs -> hs.getPackageEntity().getBarcode().equals(packageEntity.getBarcode()))
+                        .findFirst()
+                        .orElse(null)));
 
         packageRepository.saveAll(packages);
         return true;
@@ -184,8 +198,8 @@ public class PackageService {
 
         // Update the zone name based on new command's pharmacy
         String zoneName = (newCommand.getPharmacy().getZone() != null)
-            ? newCommand.getPharmacy().getZone().getName()
-            : null;
+                ? newCommand.getPharmacy().getZone().getName()
+                : null;
         packageEntity.setZoneName(zoneName);
 
         // Update the command reference
@@ -200,4 +214,4 @@ public class PackageService {
     public List<PackageEntity> findPackagesByBarcodePattern(String barcodePattern) {
         return packageRepository.findByBarcodeContaining(barcodePattern);
     }
-} 
+}

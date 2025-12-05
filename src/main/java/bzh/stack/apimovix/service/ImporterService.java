@@ -113,7 +113,8 @@ public class ImporterService {
                 PackageEntity newPackage = packageService.createPackage(
                     command, 
                     packageDTO, 
-                    body.getCommand().getNum_transport()
+                    body.getCommand().getNum_transport(),
+                    packageDTO.getId()
                 );
                 packageDTO.setZoneName(newPackage.getZoneName());
                 packageDTO.setBarcode(newPackage.getBarcode());

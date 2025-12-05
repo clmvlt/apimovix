@@ -441,10 +441,19 @@ public class TourService {
 
     @Transactional
     public Tour createTour(Profil profil, @Valid TourCreateDTO tourCreateDTO) {
+        return createTour(profil, tourCreateDTO, false);
+    }
+
+    @Transactional
+    public Tour createTour(Profil profil, @Valid TourCreateDTO tourCreateDTO, boolean assignProfil) {
         Tour tour = tourMapper.toCreateEntity(tourCreateDTO);
         tour.setId(generateNewId());
         tour.setAccount(profil.getAccount());
-        tour.setProfil(profil);
+
+        // Assigner le profil uniquement si demandé (pour le scheduler)
+        if (assignProfil) {
+            tour.setProfil(profil);
+        }
 
         // Gérer la zone si fournie
         if (tourCreateDTO.getZoneId() != null) {
