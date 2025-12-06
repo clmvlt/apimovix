@@ -503,10 +503,11 @@ public class TourService {
         }
 
         Tour tour = optTour.get();
-        
+
         if (tour.getCommands() != null) {
             for (Command command : tour.getCommands()) {
                 command.setTour(null);
+                command.setTourOrder(0);
                 commandService.save(command);
             }
         }
