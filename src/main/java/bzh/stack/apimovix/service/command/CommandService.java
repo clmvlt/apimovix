@@ -119,18 +119,12 @@ public class CommandService {
             return Optional.empty();
         Command command = createCommand(pharmacyOptional.get(), sender, profil, commandDTO, expDate, newPharmacy);
         List<PackageEntity> packages = commandDTO.getPackages().stream()
-                .map(packageDTO -> {
-                    PackageEntity newPackage = packageService.createPackage(
+                .map(packageDTO -> packageService.createPackage(
                             command,
                             packageDTO,
                             commandDTO.getNum_transport(),
-                        packageDTO.getId());
-                    packageDTO.setBarcode(newPackage.getBarcode());
-                    packageDTO.setCNumTransport(newPackage.getCNumTransport());
-                    return newPackage;
-                })
+                            packageDTO.getId()))
                 .collect(Collectors.toList());
-                System.out.println(packages.size());
         command.setPackages(packages);
         return Optional.ofNullable(commandRepository.save(command));
     }

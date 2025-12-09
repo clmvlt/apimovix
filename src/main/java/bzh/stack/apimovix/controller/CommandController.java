@@ -36,7 +36,9 @@ import bzh.stack.apimovix.dto.command.CommandUpdateTarifDTO;
 import bzh.stack.apimovix.dto.command.CreateCommandRequestDTO;
 import bzh.stack.apimovix.dto.common.PictureDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
+import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.mapper.CommandMapper;
+import bzh.stack.apimovix.mapper.PackageMapper;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.Profil;
 import bzh.stack.apimovix.model.Sender;
@@ -72,6 +74,7 @@ public class CommandController {
     private final TourCommandService tourCommandService;
     private final CommandMapper commandMapper;
     private final SenderService senderService;
+    private final PackageMapper packageMapper;
 
     @GetMapping("/by-date/{date}")
     @Operation(summary = "Get commands by date", description = "Retrieves all expedition commands for a specific date", responses = {
@@ -275,9 +278,15 @@ public class CommandController {
             return MAPIR.notFound();
         }
         Optional<Command> createdCommand = commandService.createCommand(body.getCip(), senderOptional.get(), profil, body.getCommand(), body.getExpedition_date(), false);
+        if (createdCommand.isEmpty()) {
+            return MAPIR.notFound();
+        }
         SendCommandResponseDTO response = new SendCommandResponseDTO();
         response.setId_command(createdCommand.get().getId());
-        response.setPackages(body.getCommand().getPackages());
+        List<PackageDTO> packageDTOs = createdCommand.get().getPackages().stream()
+                .map(packageMapper::toDto)
+                .collect(Collectors.toList());
+        response.setPackages(packageDTOs);
         response.setStatus("success");
         return MAPIR.ok(response);
     }

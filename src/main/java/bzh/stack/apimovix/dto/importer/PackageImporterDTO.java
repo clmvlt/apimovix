@@ -1,11 +1,14 @@
-package bzh.stack.apimovix.dto.packageentity;
+package bzh.stack.apimovix.dto.importer;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 @Data
-@Schema(description = "Informations sur un colis")
-public class PackageDTO {
+@Schema(description = "Informations sur un colis à importer")
+public class PackageImporterDTO {
+    @Schema(description = "Identifiant unique du colis (code-barres)", example = "340002200000299670")
+    private String id;
+
     @Schema(description = "Type de colis", example = "BAC")
     private String type;
 
@@ -14,9 +17,6 @@ public class PackageDTO {
 
     @Schema(description = "Quantité", example = "1")
     private Integer quantity;
-
-    @Schema(description = "Identifiant unique du colis (code-barres)", example = "340002200000299670")
-    private String id;
 
     @Schema(description = "Poids en kg", example = "5.0")
     private Double weight;
@@ -38,19 +38,4 @@ public class PackageDTO {
 
     @Schema(description = "Numéro du colis", example = "4677")
     private String num;
-
-    @Schema(description = "Nom de la zone de livraison")
-    private String zoneName;
-
-    @Schema(description = "Numéro de transport de la commande")
-    private String cNumTransport;
-
-    @Schema(description = "Code-barres généré par le système")
-    private String barcode;
-
-    @Schema(description = "URL pour télécharger l'étiquette PDF")
-    private String labelUrl;
-
-    @Schema(description = "Statut actuel du colis")
-    private PackageStatusDTO status;
-} 
+}

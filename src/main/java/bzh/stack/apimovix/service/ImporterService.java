@@ -9,9 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import bzh.stack.apimovix.dto.importer.PackageImporterDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
+import bzh.stack.apimovix.mapper.PackageMapper;
 import bzh.stack.apimovix.dto.pharmacy.PharmacyCreateDTO;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
@@ -39,6 +41,7 @@ public class ImporterService {
     private final SenderService senderService;
     private final TourService tourService;
     private final TourCommandService tourCommandService;
+    private final PackageMapper packageMapper;
 
     @Transactional
     public SendCommandResponseDTO sendCommand(@Valid SendCommandRequestDTO body) {
@@ -74,7 +77,7 @@ public class ImporterService {
                 assignCommandToTourByZone(command);
             }
 
-            return buildResponse(command, body.getCommand().getPackages());
+            return buildResponse(command, packages);
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors du traitement de la commande", e);
         }
@@ -109,27 +112,24 @@ public class ImporterService {
     @Transactional(propagation = Propagation.REQUIRED)
     protected List<PackageEntity> createPackagesInParallel(Command command, SendCommandRequestDTO body) {
         return body.getCommand().getPackages().stream()
-            .map(packageDTO -> {
-                PackageEntity newPackage = packageService.createPackage(
-                    command, 
-                    packageDTO, 
+            .map(packageDTO -> packageService.createPackage(
+                    command,
+                    packageDTO,
                     body.getCommand().getNum_transport(),
                     packageDTO.getId()
-                );
-                packageDTO.setZoneName(newPackage.getZoneName());
-                packageDTO.setBarcode(newPackage.getBarcode());
-                packageDTO.setCNumTransport(newPackage.getCNumTransport());
-                return newPackage;
-            })
+                ))
             .collect(Collectors.toList());
     }
 
-    private SendCommandResponseDTO buildResponse(Command command, List<PackageDTO> packages) {
+    private SendCommandResponseDTO buildResponse(Command command, List<PackageEntity> packages) {
         SendCommandResponseDTO responseDTO = new SendCommandResponseDTO();
         responseDTO.setId_command(command.getId());
         responseDTO.setMessage("Commande envoyée avec succès");
         responseDTO.setStatus("success");
-        responseDTO.setPackages(packages);
+        List<PackageDTO> packageDTOs = packages.stream()
+            .map(packageMapper::toDto)
+            .collect(Collectors.toList());
+        responseDTO.setPackages(packageDTOs);
         return responseDTO;
     }
 

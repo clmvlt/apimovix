@@ -19,7 +19,6 @@ import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.service.ImporterService;
 import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.packageservices.PackageService;
-import bzh.stack.apimovix.util.GLOBAL;
 import bzh.stack.apimovix.util.MAPIR;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,11 +29,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
-@Tag(name = "Importer", description = "API for importing external data into the Movix system")
+@Tag(name = "Importer", description = "API d'import de données externes vers le système Movix. Permet aux systèmes tiers (grossistes, laboratoires) d'envoyer des commandes et de récupérer des étiquettes de colis.")
 @RequestMapping("/")
-@ApiResponse(responseCode = "400", description = GLOBAL.ERROR_400, content = @Content)
-@ApiResponse(responseCode = "401", description = GLOBAL.ERROR_401, content = @Content())
-@ApiResponse(responseCode = "403", description = GLOBAL.ERROR_403, content = @Content())
+@ApiResponse(responseCode = "400", description = "Données d'entrée invalides", content = @Content)
+@ApiResponse(responseCode = "401", description = "Non autorisé - Token d'import manquant ou invalide", content = @Content())
+@ApiResponse(responseCode = "403", description = "Accès refusé - Token d'import non autorisé pour cette action", content = @Content())
 @ImporterRequired
 public class ImporterController {
 
@@ -47,23 +46,54 @@ public class ImporterController {
     private PdfGeneratorService pdfGeneratorService;
 
     @PostMapping("/command/send")
-    @Operation(summary = "Send command", description = "Sends a command to the system for processing", responses = {
-            @ApiResponse(responseCode = "200", description = "Command successfully sent", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = SendCommandResponseDTO.class))),
-    })
+    @Operation(
+        summary = "Envoyer une commande",
+        description = """
+            Permet d'envoyer une nouvelle commande au système Movix pour traitement.
+
+            Cette route est utilisée par les systèmes tiers (grossistes, laboratoires) pour créer des commandes de livraison.
+
+            **Fonctionnement :**
+            - Si l'expéditeur (sender) n'existe pas, il sera créé automatiquement
+            - Si le destinataire (recipient/pharmacie) n'existe pas, il sera créé automatiquement
+            - Chaque colis (package) reçoit un code-barres unique et une URL d'étiquette
+            """,
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Commande créée avec succès", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = SendCommandResponseDTO.class))),
+        }
+    )
     public ResponseEntity<?> sendCommand(
-            @Parameter(description = "Command data to be sent", required = true, schema = @Schema(implementation = SendCommandRequestDTO.class)) @Valid @RequestBody SendCommandRequestDTO body) {
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Données de la commande à envoyer",
+                required = true
+            )
+            @Valid @RequestBody SendCommandRequestDTO body) {
         SendCommandResponseDTO responseDTO = importerService.sendCommand(body);
         return MAPIR.ok(responseDTO);
     }
 
     @PostMapping(value = "/package/getLabel/{barcode}", produces = {MediaType.APPLICATION_PDF_VALUE, MediaType.APPLICATION_JSON_VALUE})
-    @Operation(summary = "Get package label", description = "Generates a PDF label for a specific package using its barcode", responses = {
-            @ApiResponse(responseCode = "200", description = "Successfully generated package label", content = @Content(mediaType = MediaType.APPLICATION_PDF_VALUE, schema = @Schema(type = "string", format = "binary"))),
-            @ApiResponse(responseCode = "404", description = "Package not found", content = @Content),
-            @ApiResponse(responseCode = "500", description = "Internal server error while generating PDF", content = @Content),
-    })
+    @Operation(
+        summary = "Obtenir l'étiquette d'un colis",
+        description = """
+            Génère et retourne l'étiquette PDF d'un colis à partir de son code-barres.
+
+            **Utilisation :**
+            - Le code-barres correspond à l'identifiant unique du colis (champ `id` du package lors de l'envoi)
+            - Le fichier PDF retourné peut être directement imprimé
+
+            **Format de réponse :**
+            - Succès : Fichier PDF (application/pdf)
+            - Erreur : JSON avec message d'erreur
+            """,
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Étiquette PDF générée avec succès", content = @Content(mediaType = MediaType.APPLICATION_PDF_VALUE, schema = @Schema(type = "string", format = "binary"))),
+            @ApiResponse(responseCode = "404", description = "Colis non trouvé - Le code-barres ne correspond à aucun colis", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Erreur interne lors de la génération du PDF", content = @Content),
+        }
+    )
     public ResponseEntity<?> getLabel(
-            @Parameter(description = "Barcode of the package to generate label for", required = true) @PathVariable String barcode) {
+            @Parameter(description = "Code-barres du colis (identifiant unique)", required = true, example = "340002200000299670") @PathVariable String barcode) {
         Optional<PackageEntity> packageEntity = packageService.findPackage(barcode);
         if (packageEntity.isEmpty()) {
             return MAPIR.notFound();

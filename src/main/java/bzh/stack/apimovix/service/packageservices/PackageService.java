@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import bzh.stack.apimovix.dto.importer.PackageImporterDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageUpdateStatusDTO;
 import bzh.stack.apimovix.mapper.PackageMapper;
@@ -76,6 +77,37 @@ public class PackageService {
 
     @Transactional
     public PackageEntity createPackage(Command command, @Valid PackageDTO packageDTO, String numTransport,
+            String forceBarcode) {
+        PackageEntity packageEntity;
+        if (packageDTO != null) {
+            packageEntity = packageMapper.toEntity(packageDTO);
+        } else {
+            packageEntity = new PackageEntity();
+        }
+        String zoneName = (command.getPharmacy().getZone() != null)
+                ? command.getPharmacy().getZone().getName()
+                : null;
+        packageEntity.setZoneName(zoneName);
+        packageEntity.setCommand(command);
+        packageEntity.setCNumTransport(numTransport);
+
+        String newBarcode = generateNewBarcode(command.getPharmacy().getPostalCode(), forceBarcode);
+        packageEntity.setBarcode(newBarcode);
+
+        packageEntity = packageRepository.save(packageEntity);
+
+        Optional<PackageStatus> optStatus = packageStatusService.findPackageStatus(1);
+        if (optStatus.isPresent()) {
+            HistoryPackageStatus hs = historyPackageStatusService.createHistoryPackageStatus(packageEntity, null,
+                    optStatus.get());
+            packageEntity.setLastHistoryStatus(hs);
+        }
+
+        return packageRepository.save(packageEntity);
+    }
+
+    @Transactional
+    public PackageEntity createPackage(Command command, @Valid PackageImporterDTO packageDTO, String numTransport,
             String forceBarcode) {
         PackageEntity packageEntity;
         if (packageDTO != null) {

@@ -12,6 +12,7 @@ import org.mapstruct.factory.Mappers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import bzh.stack.apimovix.dto.importer.PackageImporterDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageStatusDTO;
 import bzh.stack.apimovix.model.PackageEntity;
@@ -33,6 +34,13 @@ public interface PackageMapper {
     @Mapping(target = "command", ignore = true)
     @Mapping(target = "lastHistoryStatus", ignore = true)
     PackageEntity toEntity(PackageDTO dto);
+
+    @Mapping(target = "command", ignore = true)
+    @Mapping(target = "lastHistoryStatus", ignore = true)
+    @Mapping(target = "zoneName", ignore = true)
+    @Mapping(target = "CNumTransport", ignore = true)
+    @Mapping(target = "barcode", ignore = true)
+    PackageEntity toEntity(PackageImporterDTO dto);
 
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
