@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import bzh.stack.apimovix.model.Todo;
+import bzh.stack.apimovix.model.TodoCategory;
+import bzh.stack.apimovix.service.TodoCategoryService;
 import bzh.stack.apimovix.service.TodoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class TodoController {
 
     private final TodoService todoService;
+    private final TodoCategoryService todoCategoryService;
 
     @GetMapping
     @Operation(summary = "Get all todos", description = "Retrieves a list of all todo items sorted by creation date", responses = {
@@ -93,5 +96,56 @@ public class TodoController {
     })
     public ResponseEntity<List<Todo>> getUncompletedTodos() {
         return ResponseEntity.ok(todoService.getUncompletedTodos());
+    }
+
+    // Category management endpoints
+
+    @GetMapping("/categories")
+    @Operation(summary = "Get all categories", description = "Retrieves a list of all todo categories", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved all categories", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TodoCategory.class, type = "array")))
+    })
+    public ResponseEntity<List<TodoCategory>> getAllCategories() {
+        return ResponseEntity.ok(todoCategoryService.getAllCategories());
+    }
+
+    @GetMapping("/categories/{id}")
+    @Operation(summary = "Get category by ID", description = "Retrieves a specific category by its unique identifier", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the category", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TodoCategory.class))),
+            @ApiResponse(responseCode = "404", description = "Category not found", content = @Content)
+    })
+    public ResponseEntity<TodoCategory> getCategoryById(
+            @Parameter(description = "ID of the category to retrieve", required = true) @PathVariable Long id) {
+        return ResponseEntity.ok(todoCategoryService.getCategoryById(id));
+    }
+
+    @PostMapping("/categories")
+    @Operation(summary = "Create new category", description = "Creates a new todo category", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully created the category", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TodoCategory.class)))
+    })
+    public ResponseEntity<TodoCategory> createCategory(
+            @Parameter(description = "Category object to create", required = true) @RequestBody TodoCategory category) {
+        return ResponseEntity.ok(todoCategoryService.createCategory(category));
+    }
+
+    @PutMapping("/categories/{id}")
+    @Operation(summary = "Update category", description = "Updates an existing category", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully updated the category", content = @Content(mediaType = "application/json", schema = @Schema(implementation = TodoCategory.class))),
+            @ApiResponse(responseCode = "404", description = "Category not found", content = @Content)
+    })
+    public ResponseEntity<TodoCategory> updateCategory(
+            @Parameter(description = "ID of the category to update", required = true) @PathVariable Long id,
+            @Parameter(description = "Updated category information", required = true) @RequestBody TodoCategory category) {
+        return ResponseEntity.ok(todoCategoryService.updateCategory(id, category));
+    }
+
+    @DeleteMapping("/categories/{id}")
+    @Operation(summary = "Delete category", description = "Deletes an existing category", responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully deleted the category"),
+            @ApiResponse(responseCode = "404", description = "Category not found", content = @Content)
+    })
+    public ResponseEntity<Void> deleteCategory(
+            @Parameter(description = "ID of the category to delete", required = true) @PathVariable Long id) {
+        todoCategoryService.deleteCategory(id);
+        return ResponseEntity.ok().build();
     }
 }

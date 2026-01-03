@@ -116,9 +116,12 @@ public class TokenInterceptor implements HandlerInterceptor {
 
         // Vérification spéciale pour ImporterRequired
         if (importerRequired != null) {
-            if (importerTokenService.isValidToken(cleanToken)) {
+            var importerToken = importerTokenService.findActiveByToken(cleanToken);
+            if (importerToken.isPresent()) {
                 // Mettre à jour la date de dernière utilisation
                 importerTokenService.updateLastUsed(cleanToken);
+                // Ajouter le token à la requête pour validation ultérieure
+                request.setAttribute("importerToken", importerToken.get());
                 return true;
             }
             response.setStatus(HttpStatus.FORBIDDEN.value());

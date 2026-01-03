@@ -24,6 +24,15 @@ public class OpenApiConfig {
     @Value("${server.port}")
     private String serverPort;
 
+    @Value("${server.env:dev}")
+    private String serverEnv;
+
+    @Value("${app.base-url}")
+    private String apiBaseUrl;
+
+    @Value("${app.site-url}")
+    private String siteUrl;
+
     @Bean
     public OpenAPI customOpenAPI() {
         SecurityScheme securityScheme = new SecurityScheme()
@@ -31,42 +40,89 @@ public class OpenApiConfig {
                 .scheme("bearer")
                 .bearerFormat("Bearer");
 
-        // Détection automatique du protocole selon l'adresse
+        // Détection automatique du protocole selon l'environnement
         String protocol = "http";
-        boolean isProduction = !serverAddress.contains("192.168.") && !serverAddress.contains("127.0.") && !serverAddress.contains("localhost") && !serverAddress.contains("0.0.0.0");
+        boolean isProduction = "prod".equals(serverEnv);
+        boolean isBeta = "beta".equals(serverEnv);
+        boolean isDemo = "demo".equals(serverEnv);
 
-        if (isProduction) {
+        if (isProduction || isBeta || isDemo) {
             protocol = "https";
         }
 
         // Construction de l'URL serveur - sans port en production
         String serverUrl;
-        if (isProduction) {
+        if (isProduction || isBeta || isDemo) {
             serverUrl = protocol + "://" + serverAddress;
         } else {
             serverUrl = protocol + "://" + serverAddress + ":" + serverPort;
         }
 
-        if (protocol.equals("https") || serverAddress.contains("api.movix.fr")) {
+        // Configuration du titre et de la description selon l'environnement
+        String title;
+        String description;
+        String serverDescription;
+
+        if (isProduction) {
+            title = "API Movix - Production";
+            description = """
+                **API de gestion pour Movix - Environnement de PRODUCTION**
+
+                - **API** : https://api.movix.fr
+                - **Site** : https://movix.fr
+
+                ⚠️ Cet environnement est en production. Les données sont réelles.""";
+            serverDescription = "Serveur de Production";
+            securityScheme.description("Format : Bearer {TOKEN_HERE}");
+        } else if (isBeta) {
+            title = "API Movix - Beta";
+            description = """
+                **API de gestion pour Movix - Environnement BETA**
+
+                - **API** : https://api.beta.movix.fr
+                - **Site** : https://beta.movix.fr
+
+                🧪 Cet environnement est dédié aux tests avant mise en production.""";
+            serverDescription = "Serveur Beta";
+            securityScheme.description("Format : Bearer {TOKEN_HERE}");
+        } else if (isDemo) {
+            title = "API Movix - Démo";
+            description = """
+                **API de gestion pour Movix - Environnement de DÉMONSTRATION**
+
+                - **API** : https://api.demo.movix.fr
+                - **Site** : https://demo.movix.fr
+
+                🎭 Cet environnement est dédié aux démonstrations clients.""";
+            serverDescription = "Serveur Démo";
             securityScheme.description("Format : Bearer {TOKEN_HERE}");
         } else {
+            title = "API Movix - Développement";
+            description = """
+                **API de gestion pour Movix - Environnement de DÉVELOPPEMENT**
+
+                - **API** : %s
+                - **Site** : %s
+
+                🔧 Cet environnement est dédié au développement local.""".formatted(apiBaseUrl, siteUrl);
+            serverDescription = "Serveur de Développement";
             securityScheme.description("Format : Bearer {TOKEN_HERE}\nToken par défaut pour le développement : 60834d80ed7a796eb119f71ed3be010b1ff768527e6e1e5a0ee88de32b7b7854");
         }
 
         return new OpenAPI()
                 .openapi("3.0.0")
                 .info(new Info()
-                        .title("API Movix")
+                        .title(title)
                         .version("1.0")
-                        .description("API de gestion pour Movix"))
-                .addServersItem(new Server().url(serverUrl).description("API Server"))
+                        .description(description))
+                .addServersItem(new Server().url(serverUrl).description(serverDescription))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .schemaRequirement("bearerAuth", securityScheme);
     }
 
     @Bean
     public GroupedOpenApi publicApi() {
-        boolean isProduction = serverAddress.contains("api.movix.fr");
+        boolean isProduction = "prod".equals(serverEnv);
 
         if (isProduction) {
             // En production (api.movix.fr), afficher uniquement le controller Importer
@@ -99,6 +155,7 @@ public class OpenApiConfig {
                                 "SendCommandResponseDTO",
                                 "SenderDTO",
                                 "CommandImporterDTO",
+                                "PackageImporterDTO",
                                 "PharmacyCreateDTO",
                                 "PackageDTO",
                                 "PackageStatusDTO",

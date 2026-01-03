@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,9 @@ public class ProfileService {
     private final EmailService emailService;
     private final AccountRepository accountRepository;
     private final PictureService pictureService;
+
+    @Value("${app.site-url}")
+    private String siteUrl;
 
     @Transactional(readOnly = true)
     public Optional<Profil> findProfile(Account account, UUID id) {
@@ -167,6 +171,11 @@ public class ProfileService {
         }
         profileMapper.updateEntityFromUpdateDto(updateDTO, profil);
 
+        // Ne mettre à jour le mot de passe que s'il est fourni et non vide
+        if (updateDTO.getPassword() != null && !updateDTO.getPassword().trim().isEmpty()) {
+            profil.setPasswordHash(hashPassword(updateDTO.getPassword()));
+        }
+
         // Handle profile picture if provided (base64)
         if (updateDTO.getProfilPicture() != null && !updateDTO.getProfilPicture().trim().isEmpty()) {
             // Delete old picture if exists
@@ -292,7 +301,7 @@ public class ProfileService {
      */
     private void sendPasswordResetEmail(Profil profil, String token) {
         String subject = "Réinitialisation de votre mot de passe - Movix";
-        String resetUrl = "https://movix.fr/reset-password?token=" + token;
+        String resetUrl = siteUrl + "/reset-password?token=" + token;
         
         String htmlContent = generatePasswordResetEmailHtml(profil.getFullName(), resetUrl, token);
         
@@ -510,6 +519,11 @@ public class ProfileService {
         }
 
         profileMapper.updateEntityFromUpdateDto(updateDTO, profil);
+
+        // Ne mettre à jour le mot de passe que s'il est fourni et non vide
+        if (updateDTO.getPassword() != null && !updateDTO.getPassword().trim().isEmpty()) {
+            profil.setPasswordHash(hashPassword(updateDTO.getPassword()));
+        }
 
         // Handle profile picture if provided (base64)
         if (updateDTO.getProfilPicture() != null && !updateDTO.getProfilPicture().trim().isEmpty()) {

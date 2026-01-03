@@ -15,11 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 import bzh.stack.apimovix.annotation.ImporterRequired;
 import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
+import bzh.stack.apimovix.model.ImporterToken;
 import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.service.ImporterService;
 import bzh.stack.apimovix.service.pdfGenerator.PdfGeneratorService;
 import bzh.stack.apimovix.service.packageservices.PackageService;
 import bzh.stack.apimovix.util.MAPIR;
+import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,7 +31,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
-@Tag(name = "Importer", description = "API d'import de données externes vers le système Movix. Permet aux systèmes tiers (grossistes, laboratoires) d'envoyer des commandes et de récupérer des étiquettes de colis.")
+@Tag(name = "Importer", description = "API d'import de commandes vers le système Movix.")
 @RequestMapping("/")
 @ApiResponse(responseCode = "400", description = "Données d'entrée invalides", content = @Content)
 @ApiResponse(responseCode = "401", description = "Non autorisé - Token d'import manquant ou invalide", content = @Content())
@@ -49,13 +51,11 @@ public class ImporterController {
     @Operation(
         summary = "Envoyer une commande",
         description = """
-            Permet d'envoyer une nouvelle commande au système Movix pour traitement.
-
-            Cette route est utilisée par les systèmes tiers (grossistes, laboratoires) pour créer des commandes de livraison.
+            Permet d'envoyer une nouvelle commande au système Movix.
 
             **Fonctionnement :**
             - Si l'expéditeur (sender) n'existe pas, il sera créé automatiquement
-            - Si le destinataire (recipient/pharmacie) n'existe pas, il sera créé automatiquement
+            - Si le destinataire (recipient) n'existe pas, il sera créé automatiquement
             - Chaque colis (package) reçoit un code-barres unique et une URL d'étiquette
             """,
         responses = {
@@ -67,7 +67,18 @@ public class ImporterController {
                 description = "Données de la commande à envoyer",
                 required = true
             )
-            @Valid @RequestBody SendCommandRequestDTO body) {
+            @Valid @RequestBody SendCommandRequestDTO body,
+            HttpServletRequest request) {
+
+        // Vérifier que le sender.code correspond au expCode du token
+        ImporterToken importerToken = (ImporterToken) request.getAttribute("importerToken");
+        if (importerToken != null && importerToken.getExpCode() != null && !importerToken.getExpCode().isEmpty()) {
+            String senderCode = body.getSender() != null ? body.getSender().getCode() : null;
+            if (senderCode == null || !senderCode.equals(importerToken.getExpCode())) {
+                return MAPIR.forbidden("Le code expéditeur ne correspond pas au token utilisé");
+            }
+        }
+
         SendCommandResponseDTO responseDTO = importerService.sendCommand(body);
         return MAPIR.ok(responseDTO);
     }

@@ -91,6 +91,13 @@
             <version>${org.mapstruct.version}</version>
         </dependency>
 
+        <!-- JSR-305 annotations (fixes MapStruct warning) -->
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
         <!-- MapStruct binding for Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

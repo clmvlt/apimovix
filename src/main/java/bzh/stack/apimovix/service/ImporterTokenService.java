@@ -51,18 +51,19 @@ public class ImporterTokenService {
     }
 
     @Transactional
-    public ImporterToken create(String name, String description, Boolean isBetaProxy) {
+    public ImporterToken create(String name, String description, Boolean isBetaProxy, String expCode) {
         ImporterToken importerToken = new ImporterToken();
         importerToken.setName(name);
         importerToken.setDescription(description);
         importerToken.setToken(generateToken());
         importerToken.setIsActive(true);
         importerToken.setIsBetaProxy(isBetaProxy != null ? isBetaProxy : false);
+        importerToken.setExpCode(expCode);
         return importerTokenRepository.save(importerToken);
     }
 
     @Transactional
-    public ImporterToken update(UUID id, String name, String description, Boolean isActive, Boolean isBetaProxy) {
+    public ImporterToken update(UUID id, String name, String description, Boolean isActive, Boolean isBetaProxy, String expCode) {
         ImporterToken importerToken = importerTokenRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Token non trouvé"));
 
@@ -77,6 +78,9 @@ public class ImporterTokenService {
         }
         if (isBetaProxy != null) {
             importerToken.setIsBetaProxy(isBetaProxy);
+        }
+        if (expCode != null) {
+            importerToken.setExpCode(expCode);
         }
 
         return importerTokenRepository.save(importerToken);

@@ -22,6 +22,9 @@ import com.itextpdf.layout.element.Image;
 
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.PackageEntity;
+import bzh.stack.apimovix.model.Pharmacy;
+import bzh.stack.apimovix.model.PharmacyInformations;
+import bzh.stack.apimovix.repository.PharmacyInformationsRepository;
 import bzh.stack.apimovix.service.picture.PictureService;
 
 /**
@@ -34,9 +37,11 @@ public class PackageLabelGenerator {
     private static final float LABEL_HEIGHT = 421;
 
     private final PictureService pictureService;
+    private final PharmacyInformationsRepository pharmacyInformationsRepository;
 
-    public PackageLabelGenerator(PictureService pictureService) {
+    public PackageLabelGenerator(PictureService pictureService, PharmacyInformationsRepository pharmacyInformationsRepository) {
         this.pictureService = pictureService;
+        this.pharmacyInformationsRepository = pharmacyInformationsRepository;
     }
 
     /**
@@ -55,10 +60,45 @@ public class PackageLabelGenerator {
         PdfFont font = PdfFontFactory.createFont(StandardFonts.COURIER);
         PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.COURIER_BOLD);
 
-        // Récupérer le compte depuis le tour de la commande
+        // Récupérer le compte depuis le tour de la commande (pour le logo et transport)
         Account account = null;
         if (packageEntity.getCommand() != null && packageEntity.getCommand().getTour() != null) {
             account = packageEntity.getCommand().getTour().getAccount();
+        }
+
+        // Récupérer le compte du Sender (expéditeur) pour charger les PharmacyInformations du destinataire
+        Account senderAccount = null;
+        if (packageEntity.getCommand() != null && packageEntity.getCommand().getSender() != null) {
+            senderAccount = packageEntity.getCommand().getSender().getAccount();
+        }
+
+        // Récupérer la pharmacy et ses PharmacyInformations pour le compte de l'expéditeur
+        Pharmacy pharmacy = null;
+        if (packageEntity.getCommand() != null) {
+            pharmacy = packageEntity.getCommand().getPharmacy();
+        }
+        PharmacyInformations pharmacyInfo = null;
+        if (senderAccount != null && pharmacy != null) {
+            pharmacyInfo = pharmacyInformationsRepository
+                .findByCipAndAccountId(pharmacy.getCip(), senderAccount.getId())
+                .orElse(null);
+        }
+
+        // Préparer les infos destinataire (depuis PharmacyInformations ou fallback vers Pharmacy de base)
+        String destinataireName = "";
+        String destinataireAdr = "";
+        String destinataireCity = "";
+
+        if (pharmacyInfo != null) {
+            // Utiliser PharmacyInformations avec fallback vers Pharmacy de base si champ null
+            destinataireName = pharmacyInfo.getName() != null ? pharmacyInfo.getName() : (pharmacy.getName() != null ? pharmacy.getName() : "");
+            destinataireAdr = pharmacyInfo.getFullAdr() != null && !pharmacyInfo.getFullAdr().isEmpty() ? pharmacyInfo.getFullAdr() : (pharmacy.getFullAdr() != null ? pharmacy.getFullAdr() : "");
+            destinataireCity = pharmacyInfo.getFullCity() != null && !pharmacyInfo.getFullCity().isEmpty() ? pharmacyInfo.getFullCity() : (pharmacy.getFullCity() != null ? pharmacy.getFullCity() : "");
+        } else if (pharmacy != null) {
+            // Pas de PharmacyInformations, utiliser Pharmacy de base
+            destinataireName = pharmacy.getName() != null ? pharmacy.getName() : "";
+            destinataireAdr = pharmacy.getFullAdr() != null ? pharmacy.getFullAdr() : "";
+            destinataireCity = pharmacy.getFullCity() != null ? pharmacy.getFullCity() : "";
         }
 
         // Dessiner le logo
@@ -73,16 +113,28 @@ public class PackageLabelGenerator {
         PdfDrawingUtils.drawSquare(document, 10, 240, 10, 60);
 
         // Section expéditeur
-        PdfDrawingUtils.drawFullTextInZone(document, 10, 10, 90, 16, "EXPÉDITEUR :", true, ColorConstants.BLACK, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 14, 34, 300, 16, packageEntity.getCommand().getSender().getName(), false, null, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 14, 50, 300, 16, packageEntity.getCommand().getSender().getFullAdr(), false, null, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 14, 66, 300, 16, packageEntity.getCommand().getSender().getFullCity(), false, null, false, font, fontBold);
+        String senderName = "";
+        String senderAdr = "";
+        String senderCity = "";
+        if (packageEntity.getCommand() != null && packageEntity.getCommand().getSender() != null) {
+            senderName = packageEntity.getCommand().getSender().getName() != null
+                ? packageEntity.getCommand().getSender().getName() : "";
+            senderAdr = packageEntity.getCommand().getSender().getFullAdr() != null
+                ? packageEntity.getCommand().getSender().getFullAdr() : "";
+            senderCity = packageEntity.getCommand().getSender().getFullCity() != null
+                ? packageEntity.getCommand().getSender().getFullCity() : "";
+        }
 
-        // Section destinataire
+        PdfDrawingUtils.drawFullTextInZone(document, 10, 10, 90, 16, "EXPÉDITEUR :", true, ColorConstants.BLACK, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 14, 34, 300, 16, senderName, false, null, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 14, 50, 300, 16, senderAdr, false, null, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 14, 66, 300, 16, senderCity, false, null, false, font, fontBold);
+
+        // Section destinataire (utilise PharmacyInformations du compte expéditeur si disponible, sinon Pharmacy de base)
         PdfDrawingUtils.drawFullTextInZone(document, 10, 100, 105, 16, "DESTINATAIRE :", true, ColorConstants.BLACK, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 15, 115, LABEL_WIDTH - 30, 30, packageEntity.getCommand().getPharmacy().getName(), true, null, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 15, 145, LABEL_WIDTH - 30, 20, packageEntity.getCommand().getPharmacy().getFullAdr(), false, null, false, font, fontBold);
-        PdfDrawingUtils.drawFullTextInZone(document, 15, 170, LABEL_WIDTH - 30, 60, packageEntity.getCommand().getPharmacy().getFullCity(), true, null, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 15, 115, LABEL_WIDTH - 30, 30, destinataireName, true, null, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 15, 145, LABEL_WIDTH - 30, 20, destinataireAdr, false, null, false, font, fontBold);
+        PdfDrawingUtils.drawFullTextInZone(document, 15, 170, LABEL_WIDTH - 30, 60, destinataireCity, true, null, false, font, fontBold);
 
         // Section informations complémentaires
         PdfDrawingUtils.drawFullTextInZone(document, 225, 240, 60, 60, packageEntity.getZoneName(), true, ColorConstants.BLACK, true, font, fontBold);

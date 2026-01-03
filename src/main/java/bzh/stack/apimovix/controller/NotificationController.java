@@ -51,7 +51,6 @@ public class NotificationController {
     public ResponseEntity<?> getNotifications(HttpServletRequest request) {
         Profil profil = (Profil) request.getAttribute("profil");
         Account account = profil.getAccount();
-        log.info("GET /notifications - account: {}", account.getId());
 
         try {
             List<NotificationDTO> notifications = notificationService.getNotificationsByAccountId(account.getId());

@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import bzh.stack.apimovix.dto.importer.PackageImporterDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
@@ -21,6 +20,7 @@ import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInformations;
 import bzh.stack.apimovix.model.Sender;
+import bzh.stack.apimovix.model.Todo;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.service.command.CommandService;
 import bzh.stack.apimovix.service.packageservices.PackageService;
@@ -42,6 +42,7 @@ public class ImporterService {
     private final TourService tourService;
     private final TourCommandService tourCommandService;
     private final PackageMapper packageMapper;
+    private final TodoService todoService;
 
     @Transactional
     public SendCommandResponseDTO sendCommand(@Valid SendCommandRequestDTO body) {
@@ -79,7 +80,8 @@ public class ImporterService {
 
             return buildResponse(command, packages);
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors du traitement de la commande", e);
+            log.error("Erreur lors du traitement de la commande: {}", e.getMessage(), e);
+            throw new RuntimeException("Erreur lors du traitement de la commande: " + e.getMessage(), e);
         }
     }
 
@@ -101,6 +103,12 @@ public class ImporterService {
             pharmacyInfo.setNeverOrdered(false);
             pharmacy.setPharmacyInformations(pharmacyInfo);
             pharmacy = pharmacyService.save(pharmacy);
+
+            // Créer un TODO pour l'account spécifique si c'est une nouvelle pharmacie
+            if (newPharmacy && sender.getAccount() != null &&
+                "6bce8203-058c-43d4-8c92-fc5cad90acc9".equals(sender.getAccount().getId().toString())) {
+                createNewPharmacyTodo(pharmacy);
+            }
 
             return commandService.createCommand(pharmacy, sender, null, body.getCommand(),
                 body.getExpedition_date(), newPharmacy);
@@ -188,6 +196,21 @@ public class ImporterService {
 
         } catch (Exception e) {
             log.error("Error assigning command to tour by zone", e);
+            // Ne pas propager l'erreur pour ne pas bloquer la création de la commande
+        }
+    }
+
+    private void createNewPharmacyTodo(Pharmacy pharmacy) {
+        try {
+            Todo todo = new Todo();
+            todo.setTitle("Nouvelle pharmacie - Étiquette et clé");
+            todo.setDescription("Étiquette à poser et clé à avoir pour la pharmacie: " +
+                pharmacy.getName() + " (CIP: " + pharmacy.getCip() + ")");
+            todo.setCompleted(false);
+            todoService.createTodo(todo);
+            log.info("TODO created for new pharmacy: {}", pharmacy.getCip());
+        } catch (Exception e) {
+            log.error("Error creating TODO for new pharmacy", e);
             // Ne pas propager l'erreur pour ne pas bloquer la création de la commande
         }
     }

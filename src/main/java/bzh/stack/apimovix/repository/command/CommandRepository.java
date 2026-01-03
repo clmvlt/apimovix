@@ -20,7 +20,6 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
 
     @Query("SELECT c FROM Command c " +
            "LEFT JOIN FETCH c.pharmacy p " +
-           "LEFT JOIN FETCH p.pharmacyInformationsList " +
            "WHERE c.pharmacy.cip = :cip AND c.sender.account = :account " +
            "AND (c.lastHistoryStatus IS NULL OR c.lastHistoryStatus.status.id = 1) " +
            "AND DATE(c.expDate) = DATE(:date) " +

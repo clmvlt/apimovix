@@ -37,8 +37,8 @@ public class RequestLoggingInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, @Nullable Exception ex) {
         try {
-            // Skip logging for routes containing "logs"
-            if (request.getRequestURI().contains("logs")) {
+            // Skip logging for routes containing "logs" or "errors/logs"
+            if (request.getRequestURI().contains("logs") || request.getRequestURI().contains("errors/logs")) {
                 return;
             }
 

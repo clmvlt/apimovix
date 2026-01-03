@@ -431,8 +431,8 @@ public class TourService {
             }
         }
 
-        // Recalculer les routes pour toutes les tournées affectées en utilisant TourCommandService
-        if (!tourIdsToUpdate.isEmpty()) {
+        // Recalculer les routes pour toutes les tournées affectées uniquement si autoUpdateRoute est true
+        if (tourUpdateOrderDTO.isAutoUpdateRoute() && !tourIdsToUpdate.isEmpty()) {
             tourCommandService.updateTourRoutes(account, tourIdsToUpdate);
         }
 
@@ -539,33 +539,38 @@ public class TourService {
         List<Tour> tours = findToursByDateRange(account, startDate, endDate);
         List<Tarif> tarifs = tarifService.findTarifsByAccount(account);
 
-        // Charger les PharmacyInformations pour chaque pharmacy dans les commands (déjà fait dans findToursByDateRange)
-
-        return tours.stream()
-                .flatMap(tour -> tour.getCommands().stream())
+        // Pré-calculer toutes les distances en une seule passe pour éviter les appels API répétés
+        List<Command> allCommands = tours.stream()
+                .flatMap(tour -> tour.getCommands() != null ? tour.getCommands().stream() : java.util.stream.Stream.empty())
                 .filter(command -> command.getPharmacy() != null)
+                .collect(Collectors.toList());
+
+        Map<UUID, Double> distanceCache = new java.util.HashMap<>();
+        for (Command command : allCommands) {
+            distanceCache.put(command.getId(), orsService.calculateCommandDistance(command).orElse(0.0));
+        }
+
+        return allCommands.stream()
                 .collect(Collectors.groupingBy(
-                        command -> command.getPharmacy(),
+                        command -> command.getPharmacy().getCip(),
                         Collectors.collectingAndThen(
                                 Collectors.toList(),
                                 commands -> {
-                                    // Calculer les statistiques pour cette pharmacie
                                     long orderCount = commands.size();
-                                    long packageCount = commands.stream().mapToLong(cmd -> cmd.getPackages() != null ? cmd.getPackages().size() : 0).sum();
+                                    long packageCount = commands.stream()
+                                            .mapToLong(cmd -> cmd.getPackages() != null ? cmd.getPackages().size() : 0)
+                                            .sum();
                                     double totalPrice = 0.0;
                                     double totalDistance = 0.0;
-                                    
+
                                     for (Command command : commands) {
-                                        Double distance = orsService.calculateCommandDistance(command).orElse(0.0);
+                                        Double distance = distanceCache.getOrDefault(command.getId(), 0.0);
                                         totalDistance += distance;
-                                        
-                                        // Calculer le tarif pour cette commande
-                                        totalPrice += calculateEstimatedTarif(command, tarifs);
+                                        totalPrice += calculateEstimatedTarifWithDistance(command, tarifs, distance);
                                     }
-                                    
+
                                     double averageDistance = orderCount > 0 ? totalDistance / orderCount : 0.0;
-                                    
-                                    // Convertir les commandes en CommandStatsDTO
+
                                     List<PharmacyOrderStatsDTO.CommandStatsDTO> commandStats = commands.stream()
                                             .sorted((c1, c2) -> {
                                                 if (c1.getTourOrder() == null && c2.getTourOrder() == null) return 0;
@@ -573,9 +578,10 @@ public class TourService {
                                                 if (c2.getTourOrder() == null) return -1;
                                                 return Integer.compare(c1.getTourOrder(), c2.getTourOrder());
                                             })
-                                            .map(command -> new PharmacyOrderStatsDTO.CommandStatsDTO(command, tarifs, orsService))
+                                            .map(command -> new PharmacyOrderStatsDTO.CommandStatsDTO(
+                                                    command, tarifs, distanceCache.getOrDefault(command.getId(), 0.0)))
                                             .collect(Collectors.toList());
-                                    
+
                                     return new PharmacyOrderStatsDTO(
                                             new bzh.stack.apimovix.dto.pharmacy.PharmacyDTO(commands.get(0).getPharmacy()),
                                             orderCount,
@@ -600,13 +606,11 @@ public class TourService {
                 .collect(Collectors.toList());
     }
 
-    private Double calculateEstimatedTarif(Command command, List<Tarif> tarifs) {
+    private Double calculateEstimatedTarifWithDistance(Command command, List<Tarif> tarifs, Double distance) {
         if (command.getTarif() != null) {
             return command.getTarif();
         }
 
-        // Calculer le tarif estimé basé sur la distance
-        Double distance = orsService.calculateCommandDistance(command).orElse(0.0);
         Optional<Tarif> matchingTarif = tarifs.stream()
                 .filter(tarif -> distance <= tarif.getKmMax())
                 .min((t1, t2) -> Double.compare(t1.getKmMax(), t2.getKmMax()));

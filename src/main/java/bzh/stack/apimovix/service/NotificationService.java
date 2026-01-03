@@ -33,8 +33,6 @@ public class NotificationService {
      */
     @Transactional(readOnly = true)
     public List<NotificationDTO> getNotificationsByAccountId(UUID accountId) {
-        log.info("Fetching notifications for account: {}", accountId);
-
         // Get all unread notifications
         List<Notification> unreadNotifications = notificationRepository.findByAccountIdAndIsReadFalseOrderByCreatedAtDesc(accountId);
 
@@ -51,9 +49,6 @@ public class NotificationService {
 
         // Sort by createdAt descending to maintain order
         allNotifications.sort((n1, n2) -> n2.getCreatedAt().compareTo(n1.getCreatedAt()));
-
-        log.info("Returning {} unread + {} read notifications for account: {}",
-                unreadNotifications.size(), limitedReadNotifications.size(), accountId);
 
         return allNotifications.stream()
                 .map(notificationMapper::toDTO)

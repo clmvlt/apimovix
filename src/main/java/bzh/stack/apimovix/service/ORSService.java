@@ -427,16 +427,23 @@ public class ORSService {
 
     public Optional<RouteResponseDTO> calculateTourRoute(Tour tour) {
         RouteRequestDTO routeRequestDTO = new RouteRequestDTO();
-        
+
         CoordsDTO startCoords = new CoordsDTO();
         startCoords.setId("start");
         startCoords.setLat(tour.getAccount().getLatitude());
         startCoords.setLon(tour.getAccount().getLongitude());
-        
+
         List<CoordsDTO> allCoordinates = new ArrayList<>();
-        allCoordinates.add(startCoords); 
-        
+        allCoordinates.add(startCoords);
+
+        // Trier les commandes par tourOrder pour respecter l'ordre de la tournée
         allCoordinates.addAll(tour.getCommands().stream()
+                .sorted((c1, c2) -> {
+                    if (c1.getTourOrder() == null && c2.getTourOrder() == null) return 0;
+                    if (c1.getTourOrder() == null) return 1;
+                    if (c2.getTourOrder() == null) return -1;
+                    return c1.getTourOrder().compareTo(c2.getTourOrder());
+                })
                 .map(command -> {
                     CoordsDTO coords = new CoordsDTO();
                     coords.setLat(command.getPharmacy().getLatitude());
@@ -445,9 +452,9 @@ public class ORSService {
                     return coords;
                 })
                 .toList());
-                
+
         allCoordinates.add(startCoords);
-        
+
         routeRequestDTO.setCoordinates(allCoordinates);
         routeRequestDTO.setReturnCoords(false);
 

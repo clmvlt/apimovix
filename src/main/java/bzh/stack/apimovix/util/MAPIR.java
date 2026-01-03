@@ -47,6 +47,15 @@ public class MAPIR {
     }
 
     /**
+     * Retourne une réponse avec le code HTTP 403 (Forbidden) avec un message
+     * @param message Le message d'erreur à retourner
+     * @return ResponseEntity avec le code 403
+     */
+    public static ResponseEntity<?> forbidden(String message) {
+        return ResponseEntity.status(403).body(message);
+    }
+
+    /**
      * Retourne une réponse avec le code HTTP 204 (No Content)
      * @return ResponseEntity avec le code 204
      */

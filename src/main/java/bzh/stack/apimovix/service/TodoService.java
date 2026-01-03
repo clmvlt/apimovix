@@ -37,12 +37,13 @@ public class TodoService {
 
     public Todo updateTodo(Long id, Todo todoDetails) {
         Todo todo = getTodoById(id);
-        
+
         todo.setTitle(todoDetails.getTitle());
         todo.setDescription(todoDetails.getDescription());
         todo.setCompleted(todoDetails.isCompleted());
+        todo.setCategory(todoDetails.getCategory());
         todo.setUpdatedAt(LocalDateTime.now().format(formatter));
-        
+
         return todoRepository.save(todo);
     }
 

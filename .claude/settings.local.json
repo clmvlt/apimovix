@@ -25,7 +25,8 @@
       "Bash(where mvn:*)",
       "Bash(for file in repository/ProfileCreationTokenRepository.java service/ProfileCreationTokenService.java mapper/ProfileCreationTokenMapper.java controller/ProfileCreationTokenController.java dto/token/ProfileCreationTokenDTO.java dto/token/ProfileCreationTokenCreateDTO.java)",
       "Bash(do sed -i 's/TokenCreationProfil/ProfileCreationToken/g' \"$file\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

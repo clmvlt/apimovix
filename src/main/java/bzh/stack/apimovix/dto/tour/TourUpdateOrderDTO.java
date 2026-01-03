@@ -13,4 +13,6 @@ public class TourUpdateOrderDTO {
     @NotNull(message = GLOBAL.REQUIRED)
     @NotEmpty(message = GLOBAL.CANNOT_BE_EMPTY)
     private List<CommandUpdateOrderDTO> commands;
+
+    private boolean autoUpdateRoute = false;
 }

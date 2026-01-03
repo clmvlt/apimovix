@@ -1,9 +1,11 @@
 package bzh.stack.apimovix.dto.importer;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(description = "Informations sur un colis à importer")
 public class PackageImporterDTO {
     @Schema(description = "Identifiant unique du colis (code-barres)", example = "340002200000299670")

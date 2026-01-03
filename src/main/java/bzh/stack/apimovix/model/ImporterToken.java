@@ -44,6 +44,9 @@ public class ImporterToken {
     @Column(name = "is_beta_proxy", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isBetaProxy = false;
 
+    @Column(name = "exp_code")
+    private String expCode;
+
     @Column(name = "created_at")
     @CreationTimestamp
     @JsonFormat(pattern = PATTERNS.DATETIME)

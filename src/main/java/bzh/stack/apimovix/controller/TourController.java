@@ -160,6 +160,17 @@ public class TourController {
             @Parameter(description = "Updated tour information", required = true, schema = @Schema(implementation = TourUpdateDTO.class)) @RequestBody TourUpdateDTO tourUpdate) {
         Profil profil = (Profil) request.getAttribute("profil");
 
+        // Si l'utilisateur a seulement le rôle mobile, vérifier qu'il est assigné à la tournée
+        if (isMobileOnly(profil)) {
+            Optional<Tour> optTour = tourService.findTour(profil.getAccount(), id);
+            if (optTour.isEmpty()) {
+                return MAPIR.notFound();
+            }
+            if (!isAssignedToTour(profil, optTour.get())) {
+                return MAPIR.forbidden();
+            }
+        }
+
         Optional<Tour> optEditedTour = tourService.updateTour(profil.getAccount(), id, tourUpdate, profil);
         if (optEditedTour.isEmpty()) {
             return MAPIR.notFound();
@@ -244,11 +255,23 @@ public class TourController {
             @ApiResponse(responseCode = "204", description = "Successfully updated tour order", content = @Content),
             @ApiResponse(responseCode = "404", description = "Tour not found", content = @Content),
     })
+    @MobileRequired
     public ResponseEntity<?> updateOrder(
             HttpServletRequest request,
             @Parameter(description = "Tour order update data", required = true, schema = @Schema(implementation = TourUpdateOrderDTO.class)) @Valid @RequestBody TourUpdateOrderDTO tourUpdateOrderDTO,
             @Parameter(description = "ID of the tour to update order for", required = true) @PathVariable String id) {
         Profil profil = (Profil) request.getAttribute("profil");
+
+        // Si l'utilisateur a seulement le rôle mobile, vérifier qu'il est assigné à la tournée
+        if (isMobileOnly(profil)) {
+            Optional<Tour> optTour = tourService.findTour(profil.getAccount(), id);
+            if (optTour.isEmpty()) {
+                return MAPIR.notFound();
+            }
+            if (!isAssignedToTour(profil, optTour.get())) {
+                return MAPIR.forbidden();
+            }
+        }
 
         boolean updated = tourService.updateTourOrder(profil.getAccount(), tourUpdateOrderDTO);
         if (!updated) {
@@ -355,5 +378,21 @@ public class TourController {
         } catch (IOException e) {
             return MAPIR.internalServerError();
         }
+    }
+
+    /**
+     * Vérifie si l'utilisateur a uniquement le rôle mobile (pas web ni admin)
+     */
+    private boolean isMobileOnly(Profil profil) {
+        boolean isWeb = Boolean.TRUE.equals(profil.getIsWeb());
+        boolean isAdmin = Boolean.TRUE.equals(profil.getIsAdmin());
+        return !isWeb && !isAdmin;
+    }
+
+    /**
+     * Vérifie si le profil est assigné à la tournée
+     */
+    private boolean isAssignedToTour(Profil profil, Tour tour) {
+        return tour.getProfil() != null && tour.getProfil().getId().equals(profil.getId());
     }
 }

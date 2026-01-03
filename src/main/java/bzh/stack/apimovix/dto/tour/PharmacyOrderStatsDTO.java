@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import bzh.stack.apimovix.dto.pharmacy.PharmacyDTO;
 import bzh.stack.apimovix.model.Command;
-import bzh.stack.apimovix.service.ORSService;
 import bzh.stack.apimovix.util.PATTERNS;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -66,7 +65,7 @@ public class PharmacyOrderStatsDTO {
             this.tarif = command.getTarif();
         }
         
-        public CommandStatsDTO(Command command, List<bzh.stack.apimovix.model.Tarif> tarifs, ORSService orsService) {
+        public CommandStatsDTO(Command command, List<bzh.stack.apimovix.model.Tarif> tarifs, Double preCalculatedDistance) {
             this.id = command.getId();
             this.closeDate = command.getCloseDate();
             this.tourOrder = command.getTourOrder();
@@ -76,17 +75,16 @@ public class PharmacyOrderStatsDTO {
             this.latitude = command.getLatitude();
             this.longitude = command.getLongitude();
             this.packageCount = command.getPackages() != null ? (long) command.getPackages().size() : 0L;
-            
-            // Calculer le tarif : si null, utiliser le tarif estimé
+
+            // Calculer le tarif : si null, utiliser le tarif estimé basé sur la distance pré-calculée
             if (command.getTarif() != null) {
                 this.tarif = command.getTarif();
             } else {
-                // Calculer le tarif estimé basé sur la distance
-                Double distance = orsService.calculateCommandDistance(command).orElse(0.0);
+                Double distance = preCalculatedDistance != null ? preCalculatedDistance : 0.0;
                 Optional<bzh.stack.apimovix.model.Tarif> matchingTarif = tarifs.stream()
                         .filter(tarif -> distance <= tarif.getKmMax())
                         .min((t1, t2) -> Double.compare(t1.getKmMax(), t2.getKmMax()));
-                
+
                 this.tarif = matchingTarif.map(bzh.stack.apimovix.model.Tarif::getPrixEuro).orElse(0.0);
             }
         }
