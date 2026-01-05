@@ -63,7 +63,7 @@ public class ProfileCreationTokenService {
         token.setIsUsed(false);
 
         ProfileCreationToken savedToken = tokenCreationProfilRepository.save(token);
-        log.info("Token de création de profil créé pour le compte {}", accountId);
+        log.info("Token de creation de profil cree pour le compte {}", accountId);
 
         return savedToken;
     }
@@ -92,7 +92,7 @@ public class ProfileCreationTokenService {
         token.markAsUsed();
         ProfileCreationToken savedToken = tokenCreationProfilRepository.save(token);
 
-        log.info("Token de création de profil utilisé pour le compte {}", token.getAccount().getId());
+        log.info("Token de creation de profil utilise pour le compte {}", token.getAccount().getId());
 
         return savedToken;
     }
@@ -143,7 +143,7 @@ public class ProfileCreationTokenService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("Compte introuvable"));
         tokenCreationProfilRepository.invalidateAllTokensForAccount(account);
-        log.info("Tous les tokens de création de profil invalidés pour le compte {}", accountId);
+        log.info("Tous les tokens de creation de profil invalides pour le compte {}", accountId);
     }
 
     /**
@@ -154,7 +154,7 @@ public class ProfileCreationTokenService {
     @Transactional
     public void deleteToken(UUID tokenId) {
         tokenCreationProfilRepository.deleteById(tokenId);
-        log.info("Token de création de profil {} supprimé", tokenId);
+        log.info("Token de creation de profil {} supprime", tokenId);
     }
 
     /**
@@ -228,7 +228,7 @@ public class ProfileCreationTokenService {
         token.markAsUsed();
         tokenCreationProfilRepository.save(token);
 
-        log.info("Profil {} créé avec le token pour le compte {}", profil.getId(), account.getId());
+        log.info("Profil {} cree avec le token pour le compte {}", profil.getId(), account.getId());
 
         return profil;
     }

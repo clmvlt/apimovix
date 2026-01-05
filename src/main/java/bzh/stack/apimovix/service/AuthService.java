@@ -39,7 +39,7 @@ public class AuthService {
 
             // Vérifier que l'account associé est actif
             if (profil.getAccount() != null && Boolean.FALSE.equals(profil.getAccount().getIsActive())) {
-                log.warn("Tentative de connexion avec un compte désactivé: {}", identifiant);
+                log.warn("Tentative de connexion avec un compte desactive: {}", identifiant);
                 return Optional.empty();
             }
 

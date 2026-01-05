@@ -1,6 +1,8 @@
 package bzh.stack.apimovix.scheduler;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,18 +24,27 @@ public class LogCleanupScheduler {
     private static final int RETENTION_DAYS = 14;
 
     /**
+     * Exécute le nettoyage au démarrage de l'application
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void cleanupOnStartup() {
+        log.info("=== Execution du nettoyage des logs au demarrage ===");
+        cleanupOldLogs();
+    }
+
+    /**
      * Tâche planifiée exécutée tous les jours à 2h du matin (en même temps que le nettoyage des photos)
      * Supprime les fichiers de logs de plus de 2 semaines
      */
     @Scheduled(cron = "0 0 2 * * *")
     public void cleanupOldLogs() {
-        log.info("=== Démarrage du nettoyage automatique des logs ===");
+        log.info("=== Demarrage du nettoyage automatique des logs ===");
 
         int apiLogsDeleted = cleanupDirectory(API_LOGS_DIR);
         int errorLogsDeleted = cleanupDirectory(ERROR_LOGS_DIR);
 
         log.info("=== Fin du nettoyage des logs ===");
-        log.info("Résultat: {} logs API supprimés, {} logs erreurs supprimés", apiLogsDeleted, errorLogsDeleted);
+        log.info("Resultat: {} logs API supprimes, {} logs erreurs supprimes", apiLogsDeleted, errorLogsDeleted);
     }
 
     private int cleanupDirectory(String directory) {
@@ -41,7 +52,7 @@ public class LogCleanupScheduler {
         int deletedCount = 0;
 
         if (!Files.exists(dirPath)) {
-            log.debug("Répertoire {} n'existe pas, rien à nettoyer", directory);
+            log.debug("Repertoire {} n'existe pas, rien a nettoyer", directory);
             return 0;
         }
 
@@ -57,7 +68,7 @@ public class LogCleanupScheduler {
                 try {
                     Files.delete(file);
                     deletedCount++;
-                    log.debug("Fichier supprimé: {}", file);
+                    log.debug("Fichier supprime: {}", file);
                 } catch (IOException e) {
                     log.warn("Impossible de supprimer le fichier: {}", file, e);
                 }
@@ -67,7 +78,7 @@ public class LogCleanupScheduler {
             cleanupEmptyDirectories(dirPath);
 
         } catch (IOException e) {
-            log.error("Erreur lors du nettoyage du répertoire: {}", directory, e);
+            log.error("Erreur lors du nettoyage du repertoire: {}", directory, e);
         }
 
         return deletedCount;
@@ -93,14 +104,14 @@ public class LogCleanupScheduler {
                         try {
                             if (isDirectoryEmpty(dir)) {
                                 Files.delete(dir);
-                                log.debug("Répertoire vide supprimé: {}", dir);
+                                log.debug("Repertoire vide supprime: {}", dir);
                             }
                         } catch (IOException e) {
                             // Ignorer les erreurs de suppression de répertoires
                         }
                     });
         } catch (IOException e) {
-            log.warn("Erreur lors du nettoyage des répertoires vides", e);
+            log.warn("Erreur lors du nettoyage des repertoires vides", e);
         }
     }
 

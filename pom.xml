@@ -156,7 +156,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>bzh.stack.apimovix.ApiMovixApplication</mainClass>
-                    <jvmArguments>-Dspring.classformat.ignore=true</jvmArguments>
+                    <jvmArguments>-Dspring.classformat.ignore=true -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</jvmArguments>
                 </configuration>
             </plugin>
 

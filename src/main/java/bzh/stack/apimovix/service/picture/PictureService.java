@@ -215,7 +215,35 @@ public class PictureService {
             }
         }
 
+        // Nettoyer les répertoires vides après suppression des photos
+        cleanupEmptyDirectories(new File(uploadDir + File.separator + "anomalie"));
+        cleanupEmptyDirectories(new File(uploadDir + File.separator + "command"));
+
         return deletedCount;
+    }
+
+    private void cleanupEmptyDirectories(File directory) {
+        if (directory == null || !directory.exists() || !directory.isDirectory()) {
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    cleanupEmptyDirectories(file);
+                }
+            }
+        }
+
+        // Supprimer le répertoire s'il est vide (mais pas le répertoire racine anomalie/command)
+        files = directory.listFiles();
+        if (files != null && files.length == 0) {
+            String dirName = directory.getName();
+            if (!dirName.equals("anomalie") && !dirName.equals("command")) {
+                directory.delete();
+            }
+        }
     }
 
 } 

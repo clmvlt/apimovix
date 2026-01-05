@@ -43,7 +43,7 @@ public class TourAutoCreationScheduler {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void createToursOnStartup() {
-        log.info("=== Exécution de la création automatique des tournées au démarrage ===");
+        log.info("=== Execution de la creation automatique des tournees au demarrage ===");
         createDailyTours();
     }
 
@@ -54,7 +54,7 @@ public class TourAutoCreationScheduler {
     @Scheduled(cron = "0 0 8 * * *")
     @Transactional
     public void createDailyTours() {
-        log.info("=== Démarrage de la création automatique des tournées ===");
+        log.info("=== Demarrage de la creation automatique des tournees ===");
         LocalDate today = LocalDate.now();
         DayOfWeek dayOfWeek = today.getDayOfWeek();
 
@@ -65,7 +65,7 @@ public class TourAutoCreationScheduler {
 
         // Récupérer toutes les configurations actives pour ce jour
         List<TourConfig> activeConfigs = tourConfigRepository.findByActiveDay(dayBit);
-        log.info("Nombre de configurations trouvées pour aujourd'hui: {}", activeConfigs.size());
+        log.info("Nombre de configurations trouvees pour aujourd'hui: {}", activeConfigs.size());
 
         int successCount = 0;
         int errorCount = 0;
@@ -75,22 +75,22 @@ public class TourAutoCreationScheduler {
             try {
                 if (createTourFromConfig(config, today)) {
                     successCount++;
-                    log.info("Tournée créée avec succès pour config: {} (compte: {})",
+                    log.info("Tournee creee avec succes pour config: {} (compte: {})",
                         config.getTourName(), config.getAccount().getSociete());
                 } else {
                     skippedCount++;
-                    log.info("Tournée déjà existante, ignorée: {} (compte: {}, date: {})",
+                    log.info("Tournee deja existante, ignoree: {} (compte: {}, date: {})",
                         config.getTourName(), config.getAccount().getSociete(), today);
                 }
             } catch (Exception e) {
                 errorCount++;
-                log.error("Erreur lors de la création de la tournée pour config: {} (compte: {})",
+                log.error("Erreur lors de la creation de la tournee pour config: {} (compte: {})",
                     config.getTourName(), config.getAccount().getSociete(), e);
             }
         }
 
-        log.info("=== Fin de la création automatique des tournées ===");
-        log.info("Résultat: {} créations réussies, {} ignorées (déjà existantes), {} erreurs",
+        log.info("=== Fin de la creation automatique des tournees ===");
+        log.info("Resultat: {} creations reussies, {} ignorees (deja existantes), {} erreurs",
             successCount, skippedCount, errorCount);
     }
 
@@ -103,7 +103,7 @@ public class TourAutoCreationScheduler {
 
         // Vérifier si la tournée existe déjà pour ce compte, nom et date
         if (tourRepository.existsByAccountAndNameAndInitialDate(account, config.getTourName(), date)) {
-            log.debug("Tournée déjà existante - Nom: {}, Date: {}, Compte: {}",
+            log.debug("Tournee deja existante - Nom: {}, Date: {}, Compte: {}",
                 config.getTourName(), date, account.getSociete());
             return false;
         }
@@ -114,15 +114,15 @@ public class TourAutoCreationScheduler {
             // Si le profil n'est pas défini ou inactif, chercher un profil par défaut
             Optional<Profil> optProfil = getDefaultProfil(account);
             if (optProfil.isEmpty()) {
-                log.warn("Aucun profil trouvé pour le compte: {}. Impossible de créer la tournée.",
+                log.warn("Aucun profil trouve pour le compte: {}. Impossible de creer la tournee.",
                     account.getSociete());
                 return false;
             }
             profil = optProfil.get();
-            log.debug("Profil par défaut utilisé: {} pour le compte: {}",
+            log.debug("Profil par defaut utilise: {} pour le compte: {}",
                 profil.getIdentifiant(), account.getSociete());
         } else {
-            log.debug("Profil de la config utilisé: {} pour le compte: {}",
+            log.debug("Profil de la config utilise: {} pour le compte: {}",
                 profil.getIdentifiant(), account.getSociete());
         }
 
@@ -135,14 +135,14 @@ public class TourAutoCreationScheduler {
         // Attribuer la zone si spécifiée dans la config
         if (config.getZone() != null) {
             tourCreateDTO.setZoneId(config.getZone().getId());
-            log.debug("Zone attribuée: {} pour la tournée: {}",
+            log.debug("Zone attribuee: {} pour la tournee: {}",
                 config.getZone().getName(), config.getTourName());
         }
 
         // Créer la tournée via le service avec assignation automatique du profil
         Tour createdTour = tourService.createTour(profil, tourCreateDTO, true);
 
-        log.debug("Tournée créée - ID: {}, Nom: {}, Date: {}, Compte: {}, Profil: {}, Zone: {}",
+        log.debug("Tournee creee - ID: {}, Nom: {}, Date: {}, Compte: {}, Profil: {}, Zone: {}",
             createdTour.getId(), createdTour.getName(), date, account.getSociete(),
             profil.getIdentifiant(), config.getZone() != null ? config.getZone().getName() : "aucune");
 
@@ -162,7 +162,7 @@ public class TourAutoCreationScheduler {
                 .findFirst();
 
         if (adminProfil.isPresent()) {
-            log.debug("Profil admin trouvé pour le compte: {}", account.getSociete());
+            log.debug("Profil admin trouve pour le compte: {}", account.getSociete());
             return adminProfil;
         }
 
@@ -172,7 +172,7 @@ public class TourAutoCreationScheduler {
                 .findFirst();
 
         if (activeProfil.isPresent()) {
-            log.debug("Profil actif trouvé pour le compte: {}", account.getSociete());
+            log.debug("Profil actif trouve pour le compte: {}", account.getSociete());
         }
 
         return activeProfil;

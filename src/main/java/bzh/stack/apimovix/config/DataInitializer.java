@@ -39,7 +39,7 @@ public class DataInitializer {
 
     private void initCommandStatuses() {
         if (commandStatusRepository.count() == 0) {
-            log.info("Initialisation des statuts de commande par défaut...");
+            log.info("Initialisation des statuts de commande par defaut...");
 
             createCommandStatus(1, "À enlever");
             createCommandStatus(2, "Chargé");
@@ -51,13 +51,13 @@ public class DataInitializer {
             createCommandStatus(8, "Non livré - Inaccessible");
             createCommandStatus(9, "Non livré - Instructions invalides");
 
-            log.info("Statuts de commande initialisés avec succès.");
+            log.info("Statuts de commande initialises avec succes.");
         }
     }
 
     private void initPackageStatuses() {
         if (packageStatusRepository.count() == 0) {
-            log.info("Initialisation des statuts de colis par défaut...");
+            log.info("Initialisation des statuts de colis par defaut...");
 
             createPackageStatus(1, "À enlever");
             createPackageStatus(2, "Chargé");
@@ -66,13 +66,13 @@ public class DataInitializer {
             createPackageStatus(5, "Non chargé - MANQUANT");
             createPackageStatus(6, "Non livré - ANOMALIE");
 
-            log.info("Statuts de colis initialisés avec succès.");
+            log.info("Statuts de colis initialises avec succes.");
         }
     }
 
     private void initTourStatuses() {
         if (tourStatusRepository.count() == 0) {
-            log.info("Initialisation des statuts de tournée par défaut...");
+            log.info("Initialisation des statuts de tournee par defaut...");
 
             createTourStatus(1, "Création");
             createTourStatus(2, "Chargement");
@@ -80,13 +80,13 @@ public class DataInitializer {
             createTourStatus(4, "Debrief");
             createTourStatus(5, "Clôturé");
 
-            log.info("Statuts de tournée initialisés avec succès.");
+            log.info("Statuts de tournee initialises avec succes.");
         }
     }
 
     private void initTypeAnomalies() {
         if (typeAnomalieRepository.count() == 0) {
-            log.info("Initialisation des types d'anomalie par défaut...");
+            log.info("Initialisation des types d'anomalie par defaut...");
 
             createTypeAnomalie("c_dev", "Colis dévoyé");
             createTypeAnomalie("c_end", "Colis endommagé");
@@ -94,7 +94,7 @@ public class DataInitializer {
             createTypeAnomalie("other", "Autre");
             createTypeAnomalie("excu_temp", "Excursion de température");
 
-            log.info("Types d'anomalie initialisés avec succès.");
+            log.info("Types d'anomalie initialises avec succes.");
         }
     }
 

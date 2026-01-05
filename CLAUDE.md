@@ -79,6 +79,11 @@ bzh.stack.apimovix/
 
 ## Development Notes
 
+### Logging
+- **Ne pas utiliser d'accents** dans les messages de logs (`log.info()`, `log.debug()`, etc.)
+- La console Windows ne gere pas correctement l'UTF-8, les accents s'affichent mal
+- Exemple: utiliser `"Execution du nettoyage"` au lieu de `"Exécution du nettoyage"`
+
 ### Database Configuration
 - Uses PostgreSQL with connection details in `application.properties`
 - JPA entities use UUID primary keys

@@ -23,9 +23,9 @@ public class PasswordResetService {
     public void cleanupExpiredTokens() {
         try {
             passwordResetTokenRepository.deleteExpiredTokens();
-            log.info("Nettoyage des tokens de réinitialisation expirés effectué");
+            log.info("Nettoyage des tokens de reinitialisation expires effectue");
         } catch (Exception e) {
-            log.error("Erreur lors du nettoyage des tokens expirés", e);
+            log.error("Erreur lors du nettoyage des tokens expires", e);
         }
     }
 } 
