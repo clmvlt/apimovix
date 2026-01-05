@@ -37,8 +37,9 @@ public class RequestLoggingInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, @Nullable Exception ex) {
         try {
-            // Skip logging for routes containing "logs" or "errors/logs"
-            if (request.getRequestURI().contains("logs") || request.getRequestURI().contains("errors/logs")) {
+            // Skip logging for routes containing "logs", "errors/logs", or root path "/" (often hit by bots)
+            String uri = request.getRequestURI();
+            if (uri.contains("logs") || uri.contains("errors/logs") || uri.equals("/")) {
                 return;
             }
 

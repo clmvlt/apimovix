@@ -48,10 +48,10 @@ public class TourAutoCreationScheduler {
     }
 
     /**
-     * Tâche planifiée exécutée tous les jours à minuit (00:00:00)
+     * Tâche planifiée exécutée tous les jours à 8h du matin (08:00:00)
      * Crée automatiquement les tournées en fonction des configurations actives pour le jour
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 8 * * *")
     @Transactional
     public void createDailyTours() {
         log.info("=== Démarrage de la création automatique des tournées ===");
