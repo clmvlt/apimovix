@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 
 /**
@@ -42,6 +43,9 @@ public class TourConfigDetailDTO {
 
     @Schema(description = "Tour recurrence settings by day of week")
     private RecurrenceDTO recurrence;
+
+    @Schema(description = "Hour at which the tour is automatically created (0-23)", example = "08:00")
+    private LocalTime tourHour;
 
     @Schema(description = "Creation timestamp", example = "2024-12-04T10:30:00")
     private LocalDateTime createdAt;

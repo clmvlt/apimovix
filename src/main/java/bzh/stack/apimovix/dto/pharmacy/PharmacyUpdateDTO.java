@@ -30,6 +30,9 @@ public class PharmacyUpdateDTO {
     @Size(max = 4000, message = "Le commentaire ne peut pas dépasser 4000 caractères")
     private String commentaire;
 
+    private Boolean doubleCleTransporteur;
+    private Boolean doubleCleExpediteur;
+
     // Permet d'accepter null explicitement pour supprimer la zone
     @JsonProperty("zoneId")
     private String zoneId;

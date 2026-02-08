@@ -112,7 +112,8 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
 
     @Query(value = "SELECT DISTINCT p.cip FROM pharmacy p " +
            "LEFT JOIN pharmacy_informations pi ON p.cip = pi.cip AND CAST(pi.id_account AS VARCHAR) = :accountId " +
-           "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+           "WHERE LENGTH(p.cip) > 5 " +
+           "AND (:name IS NULL OR LOWER(COALESCE(pi.name, p.name)) LIKE LOWER(CONCAT('%', :name, '%'))) " +
            "AND (:city IS NULL OR " +
            "    (LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :city, '%')) OR " +
            "     (:cityAlias IS NOT NULL AND LOWER(COALESCE(pi.city, p.city)) LIKE LOWER(CONCAT('%', :cityAlias, '%'))))) " +
@@ -131,7 +132,10 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
            "AND (:hasOrdered IS NULL OR " +
            "    (:hasOrdered = true AND (pi.never_ordered IS NULL OR pi.never_ordered = false)) OR " +
            "    (:hasOrdered = false AND pi.never_ordered = true))" +
-           " ORDER BY p.cip LIMIT :maxResults",
+           "AND (:hasPhotos IS NULL OR " +
+           "    (:hasPhotos = true AND EXISTS (SELECT 1 FROM pharmacy_picture pp WHERE pp.cip = p.cip AND CAST(pp.id_account AS VARCHAR) = :accountId)) OR " +
+           "    (:hasPhotos = false AND NOT EXISTS (SELECT 1 FROM pharmacy_picture pp WHERE pp.cip = p.cip AND CAST(pp.id_account AS VARCHAR) = :accountId)))" +
+           " ORDER BY p.cip LIMIT :maxResults OFFSET :offset",
            nativeQuery = true)
     List<String> searchPharmaciesCipsByAccount(
         @Param("accountId") String accountId,
@@ -143,9 +147,44 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, String> {
         @Param("address") String address,
         @Param("isLocationValid") Boolean isLocationValid,
         @Param("maxResults") Integer maxResults,
+        @Param("offset") Integer offset,
         @Param("zoneId") String zoneId,
-        @Param("hasOrdered") Boolean hasOrdered
+        @Param("hasOrdered") Boolean hasOrdered,
+        @Param("hasPhotos") Boolean hasPhotos
     );
 
     boolean existsByCip(String cip);
+
+    @Query(value = "SELECT DISTINCT p.cip FROM pharmacy p " +
+           "LEFT JOIN pharmacy_informations pi ON p.cip = pi.cip AND CAST(pi.id_account AS VARCHAR) = :accountId " +
+           "WHERE LENGTH(p.cip) > 5 " +
+           "AND (:q1 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, p.name), ' ', p.cip, ' ', COALESCE(pi.city, p.city), ' ', COALESCE(pi.postal_code, p.postal_code), ' ', COALESCE(pi.address1, p.address1), ' ', COALESCE(pi.address2, p.address2), ' ', COALESCE(pi.address3, p.address3))) LIKE LOWER(CONCAT('%', :q1, '%'))) " +
+           "AND (:q2 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, p.name), ' ', p.cip, ' ', COALESCE(pi.city, p.city), ' ', COALESCE(pi.postal_code, p.postal_code), ' ', COALESCE(pi.address1, p.address1), ' ', COALESCE(pi.address2, p.address2), ' ', COALESCE(pi.address3, p.address3))) LIKE LOWER(CONCAT('%', :q2, '%'))) " +
+           "AND (:q3 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, p.name), ' ', p.cip, ' ', COALESCE(pi.city, p.city), ' ', COALESCE(pi.postal_code, p.postal_code), ' ', COALESCE(pi.address1, p.address1), ' ', COALESCE(pi.address2, p.address2), ' ', COALESCE(pi.address3, p.address3))) LIKE LOWER(CONCAT('%', :q3, '%'))) " +
+           "AND (:q4 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, p.name), ' ', p.cip, ' ', COALESCE(pi.city, p.city), ' ', COALESCE(pi.postal_code, p.postal_code), ' ', COALESCE(pi.address1, p.address1), ' ', COALESCE(pi.address2, p.address2), ' ', COALESCE(pi.address3, p.address3))) LIKE LOWER(CONCAT('%', :q4, '%'))) " +
+           "AND (:q5 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, p.name), ' ', p.cip, ' ', COALESCE(pi.city, p.city), ' ', COALESCE(pi.postal_code, p.postal_code), ' ', COALESCE(pi.address1, p.address1), ' ', COALESCE(pi.address2, p.address2), ' ', COALESCE(pi.address3, p.address3))) LIKE LOWER(CONCAT('%', :q5, '%'))) " +
+           "AND (:zoneId IS NULL OR " +
+           "    (:zoneId = 'none' AND pi.id_zone IS NULL) OR " +
+           "    (:zoneId IS NOT NULL AND :zoneId != 'none' AND CAST(pi.id_zone AS VARCHAR) = :zoneId)) " +
+           "AND (:hasOrdered IS NULL OR " +
+           "    (:hasOrdered = true AND (pi.never_ordered IS NULL OR pi.never_ordered = false)) OR " +
+           "    (:hasOrdered = false AND pi.never_ordered = true))" +
+           "AND (:hasPhotos IS NULL OR " +
+           "    (:hasPhotos = true AND EXISTS (SELECT 1 FROM pharmacy_picture pp WHERE pp.cip = p.cip AND CAST(pp.id_account AS VARCHAR) = :accountId)) OR " +
+           "    (:hasPhotos = false AND NOT EXISTS (SELECT 1 FROM pharmacy_picture pp WHERE pp.cip = p.cip AND CAST(pp.id_account AS VARCHAR) = :accountId)))" +
+           " ORDER BY p.cip LIMIT :maxResults OFFSET :offset",
+           nativeQuery = true)
+    List<String> searchPharmaciesGlobalByAccount(
+        @Param("accountId") String accountId,
+        @Param("q1") String q1,
+        @Param("q2") String q2,
+        @Param("q3") String q3,
+        @Param("q4") String q4,
+        @Param("q5") String q5,
+        @Param("maxResults") Integer maxResults,
+        @Param("offset") Integer offset,
+        @Param("zoneId") String zoneId,
+        @Param("hasOrdered") Boolean hasOrdered,
+        @Param("hasPhotos") Boolean hasPhotos
+    );
 } 

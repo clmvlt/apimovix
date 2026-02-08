@@ -14,6 +14,7 @@ import bzh.stack.apimovix.dto.command.CommandBasicDTO;
 import bzh.stack.apimovix.dto.command.CommandDTO;
 import bzh.stack.apimovix.dto.command.CommandDetailDTO;
 import bzh.stack.apimovix.dto.command.CommandExpeditionDTO;
+import bzh.stack.apimovix.dto.command.CommandSimpleDTO;
 import bzh.stack.apimovix.dto.command.CommandStatusDTO;
 import bzh.stack.apimovix.model.Command;
 import bzh.stack.apimovix.model.History.HistoryCommandStatus;
@@ -47,6 +48,11 @@ public interface CommandMapper {
 
     @Named("toBasicDTO")
     CommandBasicDTO toBasicDTO(Command entity);
+
+    @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
+    @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")
+    @Named("toSimpleDTO")
+    CommandSimpleDTO toSimpleDTO(Command entity);
 
     @Mapping(target = "status.id", source = "lastHistoryStatus.status.id")
     @Mapping(target = "status.name", source = "lastHistoryStatus.status.name")

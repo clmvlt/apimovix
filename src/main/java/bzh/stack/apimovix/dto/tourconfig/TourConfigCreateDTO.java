@@ -1,5 +1,6 @@
 package bzh.stack.apimovix.dto.tourconfig;
 
+import java.time.LocalTime;
 import java.util.UUID;
 
 import bzh.stack.apimovix.dto.profil.ProfilDTO;
@@ -45,4 +46,7 @@ public class TourConfigCreateDTO {
     @NotNull(message = "La récurrence est requise")
     @Schema(description = "Tour recurrence by day of week", requiredMode = Schema.RequiredMode.REQUIRED)
     private RecurrenceDTO recurrence;
+
+    @Schema(description = "Hour at which the tour should be automatically created (0-23). Defaults to 8 if not provided.", example = "8")
+    private LocalTime tourHour;
 }

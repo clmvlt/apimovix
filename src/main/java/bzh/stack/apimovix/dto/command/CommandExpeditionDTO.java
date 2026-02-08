@@ -93,4 +93,32 @@ public class CommandExpeditionDTO {
         this.pharmacyCommentaire = pharmacyCommentaire;
         this.status = status != null ? new CommandStatusDTO(status) : null;
     }
+
+    // Constructor for fully optimized DTO projection query (all scalars, no entity loading)
+    public CommandExpeditionDTO(
+        UUID id, LocalDateTime closeDate, Integer tourOrder, LocalDateTime expDate,
+        String comment, Boolean newPharmacy, Double latitude, Double longitude,
+        String tourId, String tourName, String tourColor,
+        Long packagesNumber, Double totalWeight,
+        String pharmacyCip, String pharmacyName, String pharmacyAddress1,
+        String pharmacyCity, String pharmacyPostalCode,
+        Double pharmacyLatitude, Double pharmacyLongitude,
+        String pharmacyCommentaire,
+        CommandStatus status
+    ) {
+        this.id = id;
+        this.closeDate = closeDate;
+        this.tourOrder = tourOrder;
+        this.expDate = expDate;
+        this.comment = comment;
+        this.newPharmacy = newPharmacy;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.tour = tourId != null ? new CommandTourDTO(tourId, tourName, tourColor) : null;
+        this.packagesNumber = packagesNumber != null ? packagesNumber.intValue() : 0;
+        this.totalWeight = totalWeight != null ? totalWeight.floatValue() : 0;
+        this.pharmacy = pharmacyCip != null ? new PharmacyDTO(pharmacyCip, pharmacyName, pharmacyAddress1, pharmacyCity, pharmacyPostalCode, pharmacyLatitude, pharmacyLongitude) : null;
+        this.pharmacyCommentaire = pharmacyCommentaire;
+        this.status = status != null ? new CommandStatusDTO(status) : null;
+    }
 } 

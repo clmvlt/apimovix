@@ -67,6 +67,11 @@ public class Anomalie {
     @JoinColumn(name = "id_profil", nullable = false)
     private Profil profil;
 
+    @ManyToOne
+    @JoinColumn(name = "id_command")
+    @JsonBackReference
+    private Command command;
+
     @OneToMany(mappedBy = "anomalie", fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<AnomaliePicture> pictures = new ArrayList<>();

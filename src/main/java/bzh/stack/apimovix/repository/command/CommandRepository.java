@@ -34,15 +34,28 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "WHERE c.id IN :ids AND c.sender.account = :account")
     public List<Command> findCommandsByIds(@Param("account") Account account, @Param("ids") List<UUID> ids);
 
-    @Query("SELECT c FROM Command c " +
-           "LEFT JOIN FETCH c.tour t " +
-           "LEFT JOIN FETCH c.pharmacy p " +
-           "LEFT JOIN FETCH p.pharmacyInformationsList " +
-           "LEFT JOIN FETCH c.lastHistoryStatus " +
+    @Query("SELECT new bzh.stack.apimovix.dto.command.CommandExpeditionDTO(" +
+           "c.id, c.closeDate, c.tourOrder, c.expDate, c.comment, c.newPharmacy, " +
+           "c.latitude, c.longitude, " +
+           "t.id, t.name, t.color, " +
+           "(SELECT COUNT(pkg) FROM PackageEntity pkg WHERE pkg.command = c), " +
+           "(SELECT COALESCE(SUM(pkg.weight), 0.0) FROM PackageEntity pkg WHERE pkg.command = c), " +
+           "c.pharmacy.cip, " +
+           "COALESCE(pi.name, c.pharmacy.name), " +
+           "COALESCE(pi.address1, c.pharmacy.address1), " +
+           "COALESCE(pi.city, c.pharmacy.city), " +
+           "COALESCE(pi.postalCode, c.pharmacy.postalCode), " +
+           "COALESCE(pi.latitude, c.pharmacy.latitude), " +
+           "COALESCE(pi.longitude, c.pharmacy.longitude), " +
+           "pi.commentaire, " +
+           "c.lastHistoryStatus.status) " +
+           "FROM Command c " +
+           "LEFT JOIN c.tour t " +
+           "LEFT JOIN c.pharmacy.pharmacyInformationsList pi WITH pi.account = :account " +
            "WHERE c.sender.account = :account " +
            "AND c.expDate >= :startDate AND c.expDate < :endDate " +
-           "ORDER BY COALESCE(c.tour.id, ''), c.expDate DESC")
-    public List<Command> findExpeditionCommandsEntities(@Param("account") Account account, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+           "ORDER BY COALESCE(t.id, ''), c.expDate DESC")
+    public List<CommandExpeditionDTO> findExpeditionCommandsOptimized(@Param("account") Account account, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT new bzh.stack.apimovix.dto.command.CommandExpeditionDTO(" +
            "c.id, " +
@@ -89,23 +102,25 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "c.expDate, \n" +
            "c.comment, \n" +
            "c.newPharmacy, \n" +
-           "c.pharmacy.latitude, \n" +
-           "c.pharmacy.longitude, \n" +
-           "c.pharmacy.name, \n" +
-           "c.pharmacy.city, \n" +
-           "c.pharmacy.postalCode, \n" +
-           "c.pharmacy.address1, \n" +
-           "c.pharmacy.address2, \n" +
-           "c.pharmacy.address3 \n" +
+           "COALESCE(pi.latitude, c.pharmacy.latitude), \n" +
+           "COALESCE(pi.longitude, c.pharmacy.longitude), \n" +
+           "COALESCE(pi.name, c.pharmacy.name), \n" +
+           "COALESCE(pi.city, c.pharmacy.city), \n" +
+           "COALESCE(pi.postalCode, c.pharmacy.postalCode), \n" +
+           "COALESCE(pi.address1, c.pharmacy.address1), \n" +
+           "COALESCE(pi.address2, c.pharmacy.address2), \n" +
+           "COALESCE(pi.address3, c.pharmacy.address3) \n" +
            ") FROM Command c \n" +
+           "LEFT JOIN c.pharmacy.pharmacyInformationsList pi WITH pi.account = :account \n" +
            "WHERE (c.sender.account = :account) \n" +
-           "AND (:name IS NULL OR LOWER(c.pharmacy.name) LIKE %:name%) \n" +
-           "AND (:city IS NULL OR LOWER(c.pharmacy.city) LIKE %:city%) \n" +
+           "AND LENGTH(c.pharmacy.cip) > 5 \n" +
+           "AND (:name IS NULL OR LOWER(COALESCE(pi.name, c.pharmacy.name)) LIKE %:name%) \n" +
+           "AND (:city IS NULL OR LOWER(COALESCE(pi.city, c.pharmacy.city)) LIKE %:city%) \n" +
            "AND (:commandId IS NULL OR STR(c.id) LIKE %:commandId%) \n" +
            "AND (:pharmacyCip IS NULL OR c.pharmacy.cip LIKE %:pharmacyCip%) \n" +
-           "AND (:pharmacyPostalCode IS NULL OR c.pharmacy.postalCode LIKE %:pharmacyPostalCode%) \n" +
-           "AND (:address IS NULL OR LOWER(c.pharmacy.address1) LIKE %:address% OR LOWER(c.pharmacy.address2) LIKE %:address% OR LOWER(c.pharmacy.address3) LIKE %:address%) \n" +
-           "ORDER BY c.expDate DESC")
+           "AND (:pharmacyPostalCode IS NULL OR COALESCE(pi.postalCode, c.pharmacy.postalCode) LIKE %:pharmacyPostalCode%) \n" +
+           "AND (:address IS NULL OR LOWER(COALESCE(pi.address1, c.pharmacy.address1)) LIKE %:address% OR LOWER(COALESCE(pi.address2, c.pharmacy.address2)) LIKE %:address% OR LOWER(COALESCE(pi.address3, c.pharmacy.address3)) LIKE %:address%) \n" +
+           "ORDER BY c.expDate DESC LIMIT :limit OFFSET :offset")
     public List<CommandSearchResponseDTO> searchCommandsWithoutDates(
         @Param("account") Account account,
         @Param("name") String name,
@@ -113,7 +128,9 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
         @Param("pharmacyCip") String pharmacyCip,
         @Param("pharmacyPostalCode") String pharmacyPostalCode,
         @Param("address") String address,
-        @Param("commandId") String commandId);
+        @Param("commandId") String commandId,
+        @Param("limit") Integer limit,
+        @Param("offset") Integer offset);
 
     @Query("SELECT new bzh.stack.apimovix.dto.command.CommandSearchResponseDTO(\n" +
            "c.id, \n" +
@@ -121,24 +138,26 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
            "c.expDate, \n" +
            "c.comment, \n" +
            "c.newPharmacy, \n" +
-           "c.pharmacy.latitude, \n" +
-           "c.pharmacy.longitude, \n" +
-           "c.pharmacy.name, \n" +
-           "c.pharmacy.city, \n" +
-           "c.pharmacy.postalCode, \n" +
-           "c.pharmacy.address1, \n" +
-           "c.pharmacy.address2, \n" +
-           "c.pharmacy.address3 \n" +
+           "COALESCE(pi.latitude, c.pharmacy.latitude), \n" +
+           "COALESCE(pi.longitude, c.pharmacy.longitude), \n" +
+           "COALESCE(pi.name, c.pharmacy.name), \n" +
+           "COALESCE(pi.city, c.pharmacy.city), \n" +
+           "COALESCE(pi.postalCode, c.pharmacy.postalCode), \n" +
+           "COALESCE(pi.address1, c.pharmacy.address1), \n" +
+           "COALESCE(pi.address2, c.pharmacy.address2), \n" +
+           "COALESCE(pi.address3, c.pharmacy.address3) \n" +
            ") FROM Command c \n" +
+           "LEFT JOIN c.pharmacy.pharmacyInformationsList pi WITH pi.account = :account \n" +
            "WHERE (c.sender.account = :account) \n" +
-           "AND (:name IS NULL OR LOWER(c.pharmacy.name) LIKE %:name%) \n" +
-           "AND (:city IS NULL OR LOWER(c.pharmacy.city) LIKE %:city%) \n" +
+           "AND LENGTH(c.pharmacy.cip) > 5 \n" +
+           "AND (:name IS NULL OR LOWER(COALESCE(pi.name, c.pharmacy.name)) LIKE %:name%) \n" +
+           "AND (:city IS NULL OR LOWER(COALESCE(pi.city, c.pharmacy.city)) LIKE %:city%) \n" +
            "AND (:commandId IS NULL OR STR(c.id) LIKE %:commandId%) \n" +
            "AND (:pharmacyCip IS NULL OR c.pharmacy.cip LIKE %:pharmacyCip%) \n" +
-           "AND (:pharmacyPostalCode IS NULL OR c.pharmacy.postalCode LIKE %:pharmacyPostalCode%) \n" +
-           "AND (:address IS NULL OR LOWER(c.pharmacy.address1) LIKE %:address% OR LOWER(c.pharmacy.address2) LIKE %:address% OR LOWER(c.pharmacy.address3) LIKE %:address%) \n" +
+           "AND (:pharmacyPostalCode IS NULL OR COALESCE(pi.postalCode, c.pharmacy.postalCode) LIKE %:pharmacyPostalCode%) \n" +
+           "AND (:address IS NULL OR LOWER(COALESCE(pi.address1, c.pharmacy.address1)) LIKE %:address% OR LOWER(COALESCE(pi.address2, c.pharmacy.address2)) LIKE %:address% OR LOWER(COALESCE(pi.address3, c.pharmacy.address3)) LIKE %:address%) \n" +
            "AND c.expDate >= :startDate AND c.expDate <= :endDate \n" +
-           "ORDER BY c.expDate DESC")
+           "ORDER BY c.expDate DESC LIMIT :limit OFFSET :offset")
     public List<CommandSearchResponseDTO> searchCommandsWithDates(
         @Param("account") Account account,
         @Param("name") String name,
@@ -148,7 +167,80 @@ public interface CommandRepository extends JpaRepository<Command, UUID> {
         @Param("address") String address,
         @Param("commandId") String commandId,
         @Param("startDate") LocalDateTime startDate,
-        @Param("endDate") LocalDateTime endDate);
+        @Param("endDate") LocalDateTime endDate,
+        @Param("limit") Integer limit,
+        @Param("offset") Integer offset);
 
-    
+    // Recherche globale sans dates (multi-mots)
+    @Query("SELECT new bzh.stack.apimovix.dto.command.CommandSearchResponseDTO(\n" +
+           "c.id, \n" +
+           "c.closeDate, \n" +
+           "c.expDate, \n" +
+           "c.comment, \n" +
+           "c.newPharmacy, \n" +
+           "COALESCE(pi.latitude, c.pharmacy.latitude), \n" +
+           "COALESCE(pi.longitude, c.pharmacy.longitude), \n" +
+           "COALESCE(pi.name, c.pharmacy.name), \n" +
+           "COALESCE(pi.city, c.pharmacy.city), \n" +
+           "COALESCE(pi.postalCode, c.pharmacy.postalCode), \n" +
+           "COALESCE(pi.address1, c.pharmacy.address1), \n" +
+           "COALESCE(pi.address2, c.pharmacy.address2), \n" +
+           "COALESCE(pi.address3, c.pharmacy.address3) \n" +
+           ") FROM Command c \n" +
+           "LEFT JOIN c.pharmacy.pharmacyInformationsList pi WITH pi.account = :account \n" +
+           "WHERE (c.sender.account = :account) \n" +
+           "AND LENGTH(c.pharmacy.cip) > 5 \n" +
+           "AND (:q1 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q1%) \n" +
+           "AND (:q2 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q2%) \n" +
+           "AND (:q3 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q3%) \n" +
+           "AND (:q4 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q4%) \n" +
+           "AND (:q5 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q5%) \n" +
+           "ORDER BY c.expDate DESC LIMIT :limit OFFSET :offset")
+    public List<CommandSearchResponseDTO> searchCommandsGlobalWithoutDates(
+        @Param("account") Account account,
+        @Param("q1") String q1,
+        @Param("q2") String q2,
+        @Param("q3") String q3,
+        @Param("q4") String q4,
+        @Param("q5") String q5,
+        @Param("limit") Integer limit,
+        @Param("offset") Integer offset);
+
+    // Recherche globale avec dates (multi-mots)
+    @Query("SELECT new bzh.stack.apimovix.dto.command.CommandSearchResponseDTO(\n" +
+           "c.id, \n" +
+           "c.closeDate, \n" +
+           "c.expDate, \n" +
+           "c.comment, \n" +
+           "c.newPharmacy, \n" +
+           "COALESCE(pi.latitude, c.pharmacy.latitude), \n" +
+           "COALESCE(pi.longitude, c.pharmacy.longitude), \n" +
+           "COALESCE(pi.name, c.pharmacy.name), \n" +
+           "COALESCE(pi.city, c.pharmacy.city), \n" +
+           "COALESCE(pi.postalCode, c.pharmacy.postalCode), \n" +
+           "COALESCE(pi.address1, c.pharmacy.address1), \n" +
+           "COALESCE(pi.address2, c.pharmacy.address2), \n" +
+           "COALESCE(pi.address3, c.pharmacy.address3) \n" +
+           ") FROM Command c \n" +
+           "LEFT JOIN c.pharmacy.pharmacyInformationsList pi WITH pi.account = :account \n" +
+           "WHERE (c.sender.account = :account) \n" +
+           "AND LENGTH(c.pharmacy.cip) > 5 \n" +
+           "AND (:q1 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q1%) \n" +
+           "AND (:q2 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q2%) \n" +
+           "AND (:q3 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q3%) \n" +
+           "AND (:q4 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q4%) \n" +
+           "AND (:q5 IS NULL OR LOWER(CONCAT(COALESCE(pi.name, c.pharmacy.name), ' ', c.pharmacy.cip, ' ', COALESCE(pi.city, c.pharmacy.city), ' ', COALESCE(pi.postalCode, c.pharmacy.postalCode), ' ', COALESCE(pi.address1, c.pharmacy.address1), ' ', COALESCE(pi.address2, c.pharmacy.address2, ''), ' ', COALESCE(pi.address3, c.pharmacy.address3, ''), ' ', STR(c.id))) LIKE %:q5%) \n" +
+           "AND c.expDate >= :startDate AND c.expDate <= :endDate \n" +
+           "ORDER BY c.expDate DESC LIMIT :limit OFFSET :offset")
+    public List<CommandSearchResponseDTO> searchCommandsGlobalWithDates(
+        @Param("account") Account account,
+        @Param("q1") String q1,
+        @Param("q2") String q2,
+        @Param("q3") String q3,
+        @Param("q4") String q4,
+        @Param("q5") String q5,
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate,
+        @Param("limit") Integer limit,
+        @Param("offset") Integer offset);
 } 

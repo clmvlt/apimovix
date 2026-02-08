@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,41 +33,82 @@ import java.util.Optional;
 @Slf4j
 public class TourAutoCreationScheduler {
 
+    private static final ZoneId PARIS_ZONE = ZoneId.of("Europe/Paris");
+
     private final TourConfigRepository tourConfigRepository;
     private final TourService tourService;
     private final TourRepository tourRepository;
     private final ProfileService profileService;
 
     /**
-     * Tâche exécutée au démarrage de l'application
-     * Crée les tournées manquantes pour aujourd'hui
+     * Tache executee au demarrage de l'application
+     * Cree les tournees manquantes pour aujourd'hui dont l'heure est deja passee ou egale a l'heure courante
      */
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void createToursOnStartup() {
         log.info("=== Execution de la creation automatique des tournees au demarrage ===");
-        createDailyTours();
+        LocalDate today = LocalDate.now(PARIS_ZONE);
+        DayOfWeek dayOfWeek = today.getDayOfWeek();
+        LocalTime currentHour = LocalTime.now(PARIS_ZONE).withMinute(0).withSecond(0).withNano(0);
+        int dayBit = 1 << (dayOfWeek.getValue() - 1);
+
+        // Au demarrage, creer toutes les tournees dont l'heure est <= a l'heure courante
+        List<TourConfig> activeConfigs = tourConfigRepository.findByActiveDay(dayBit);
+        log.info("Nombre de configurations trouvees pour aujourd'hui: {}", activeConfigs.size());
+
+        int successCount = 0;
+        int errorCount = 0;
+        int skippedCount = 0;
+
+        for (TourConfig config : activeConfigs) {
+            // Ne creer que les tournees dont l'heure est deja passee ou egale
+            LocalTime configHour = config.getTourHour() != null ? config.getTourHour() : LocalTime.of(8, 0);
+            if (configHour.isAfter(currentHour)) {
+                log.debug("Tournee ignoree (heure non atteinte: {}): {} (compte: {})",
+                    configHour, config.getTourName(), config.getAccount().getSociete());
+                continue;
+            }
+            try {
+                if (createTourFromConfig(config, today)) {
+                    successCount++;
+                    log.info("Tournee creee avec succes pour config: {} (compte: {})",
+                        config.getTourName(), config.getAccount().getSociete());
+                } else {
+                    skippedCount++;
+                }
+            } catch (Exception e) {
+                errorCount++;
+                log.error("Erreur lors de la creation de la tournee pour config: {} (compte: {})",
+                    config.getTourName(), config.getAccount().getSociete(), e);
+            }
+        }
+
+        log.info("=== Fin de la creation automatique des tournees au demarrage ===");
+        log.info("Resultat: {} creations reussies, {} ignorees, {} erreurs",
+            successCount, skippedCount, errorCount);
     }
 
     /**
-     * Tâche planifiée exécutée tous les jours à 8h du matin (08:00:00)
-     * Crée automatiquement les tournées en fonction des configurations actives pour le jour
+     * Tache planifiee executee toutes les heures (a chaque heure pile)
+     * Cree automatiquement les tournees dont l'heure de config correspond a l'heure courante
      */
-    @Scheduled(cron = "0 0 8 * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "Europe/Paris")
     @Transactional
     public void createDailyTours() {
-        log.info("=== Demarrage de la creation automatique des tournees ===");
-        LocalDate today = LocalDate.now();
+        LocalTime currentHour = LocalTime.now(PARIS_ZONE).withMinute(0).withSecond(0).withNano(0);
+        log.info("=== Demarrage de la creation automatique des tournees (heure: {}) ===", currentHour);
+        LocalDate today = LocalDate.now(PARIS_ZONE);
         DayOfWeek dayOfWeek = today.getDayOfWeek();
 
         // Calculer le bit correspondant au jour (Lundi=bit 0, Dimanche=bit 6)
         int dayBit = 1 << (dayOfWeek.getValue() - 1);
 
-        log.info("Jour: {} ({}), Bit: {}", dayOfWeek, dayOfWeek.getValue(), dayBit);
+        log.info("Jour: {} ({}), Bit: {}, Heure: {}", dayOfWeek, dayOfWeek.getValue(), dayBit, currentHour);
 
-        // Récupérer toutes les configurations actives pour ce jour
-        List<TourConfig> activeConfigs = tourConfigRepository.findByActiveDay(dayBit);
-        log.info("Nombre de configurations trouvees pour aujourd'hui: {}", activeConfigs.size());
+        // Recuperer les configurations actives pour ce jour et cette heure
+        List<TourConfig> activeConfigs = tourConfigRepository.findByActiveDayAndHour(dayBit, currentHour);
+        log.info("Nombre de configurations trouvees pour aujourd'hui a {}: {}", currentHour, activeConfigs.size());
 
         int successCount = 0;
         int errorCount = 0;

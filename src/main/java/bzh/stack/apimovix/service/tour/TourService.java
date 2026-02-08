@@ -1,9 +1,17 @@
 package bzh.stack.apimovix.service.tour;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +45,7 @@ import bzh.stack.apimovix.model.History.HistoryTourStatus;
 import bzh.stack.apimovix.model.StatusType.CommandStatus;
 import bzh.stack.apimovix.model.StatusType.TourStatus;
 import bzh.stack.apimovix.repository.ZoneRepository;
+import bzh.stack.apimovix.repository.packagerepository.HistoryPackageStatusRepository;
 import bzh.stack.apimovix.repository.tour.HistoryTourStatusRepository;
 import bzh.stack.apimovix.repository.tour.TourRepository;
 import bzh.stack.apimovix.service.ORSService;
@@ -50,6 +59,7 @@ import jakarta.validation.Valid;
 public class TourService {
     private final TourMapper tourMapper;
     private final TourRepository tourRepository;
+    private final HistoryPackageStatusRepository historyPackageStatusRepository;
     private final HistoryTourStatusService historyTourStatusService;
     private final TourStatusService tourStatusService;
     private final ProfileService profileService;
@@ -64,6 +74,7 @@ public class TourService {
     public TourService(
             TourMapper tourMapper,
             TourRepository tourRepository,
+            HistoryPackageStatusRepository historyPackageStatusRepository,
             HistoryTourStatusService historyTourStatusService,
             TourStatusService tourStatusService,
             ProfileService profileService,
@@ -76,6 +87,7 @@ public class TourService {
             @Lazy TourCommandService tourCommandService) {
         this.tourMapper = tourMapper;
         this.tourRepository = tourRepository;
+        this.historyPackageStatusRepository = historyPackageStatusRepository;
         this.historyTourStatusService = historyTourStatusService;
         this.tourStatusService = tourStatusService;
         this.profileService = profileService;
@@ -86,6 +98,61 @@ public class TourService {
         this.tarifService = tarifService;
         this.zoneRepository = zoneRepository;
         this.tourCommandService = tourCommandService;
+    }
+
+    /**
+     * Parse une date string dans plusieurs formats possibles.
+     * Formats supportes:
+     * - yyyy-MM-dd HH:mm:ss
+     * - yyyy-MM-dd HH:mm
+     * - yyyy-MM-dd'T'HH:mm:ss
+     * - yyyy-MM-dd'T'HH:mm
+     * - yyyy-MM-dd (converti en 08:00)
+     * - ISO avec offset (ex: 2025-02-08T08:56:04+02:00)
+     */
+    private LocalDateTime parseFlexibleDateTime(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+
+        String value = dateStr.trim();
+
+        // Formats datetime a essayer
+        DateTimeFormatter[] formatters = {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+        };
+
+        // Essai ISO avec offset
+        try {
+            if (value.contains("T") && (value.contains("+") || value.endsWith("Z") || value.contains("-"))) {
+                OffsetDateTime odt = OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                return odt.atZoneSameInstant(ZoneId.of("Europe/Paris")).toLocalDateTime();
+            }
+        } catch (DateTimeParseException ignored) {
+        }
+
+        // Essai format date seule
+        if (value.length() == 10) {
+            try {
+                LocalDate date = LocalDate.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                return date.atTime(8, 0);
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+
+        // Essai formats datetime
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return LocalDateTime.parse(value, formatter);
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+
+        throw new IllegalArgumentException("Format de date non supporte: " + dateStr +
+            ". Utilisez 'yyyy-MM-dd', 'yyyy-MM-dd HH:mm' ou 'yyyy-MM-dd HH:mm:ss'.");
     }
 
     /**
@@ -241,11 +308,21 @@ public class TourService {
         if (tourUpdate.getInitialDate() != null) {
             tour.setInitialDate(tourUpdate.getInitialDate());
         }
+        // Handle startDate - can be set to null via empty string
         if (tourUpdate.getStartDate() != null) {
-            tour.setStartDate(tourUpdate.getStartDate());
+            if (tourUpdate.shouldClearStartDate()) {
+                tour.setStartDate(null);
+            } else {
+                tour.setStartDate(parseFlexibleDateTime(tourUpdate.getStartDate()));
+            }
         }
+        // Handle endDate - can be set to null via empty string
         if (tourUpdate.getEndDate() != null) {
-            tour.setEndDate(tourUpdate.getEndDate());
+            if (tourUpdate.shouldClearEndDate()) {
+                tour.setEndDate(null);
+            } else {
+                tour.setEndDate(parseFlexibleDateTime(tourUpdate.getEndDate()));
+            }
         }
         if (tourUpdate.getColor() != null) {
             tour.setColor(tourUpdate.getColor());
@@ -536,19 +613,26 @@ public class TourService {
 
     @Transactional(readOnly = true)
     public List<PharmacyOrderStatsDTO> getPharmacyOrderStats(Account account, LocalDate startDate, LocalDate endDate) {
-        List<Tour> tours = findToursByDateRange(account, startDate, endDate);
         List<Tarif> tarifs = tarifService.findTarifsByAccount(account);
 
-        // Pré-calculer toutes les distances en une seule passe pour éviter les appels API répétés
-        List<Command> allCommands = tours.stream()
-                .flatMap(tour -> tour.getCommands() != null ? tour.getCommands().stream() : java.util.stream.Stream.empty())
-                .filter(command -> command.getPharmacy() != null)
+        // Pre-trier les tarifs par kmMax pour lookup O(1) au lieu de O(n)
+        List<Tarif> sortedTarifs = tarifs.stream()
+                .sorted(java.util.Comparator.comparingDouble(Tarif::getKmMax))
                 .collect(Collectors.toList());
 
-        Map<UUID, Double> distanceCache = new java.util.HashMap<>();
-        for (Command command : allCommands) {
-            distanceCache.put(command.getId(), orsService.calculateCommandDistance(command).orElse(0.0));
-        }
+        // Query directe : charge les commandes avec pharmacy + sender + account en 1 seule requete
+        // (evite de charger les tours + evite loadPharmacyInformationsForCommands)
+        List<Command> allCommands = tourRepository.findCommandsForStats(account, startDate, endDate);
+
+        // Appliquer les PharmacyInformations pour ce compte
+        allCommands.forEach(command -> {
+            if (command.getPharmacy() != null) {
+                command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
+            }
+        });
+
+        // Calcul parallele des distances (10 threads au lieu de sequentiel)
+        Map<UUID, Double> distanceCache = orsService.calculateCommandDistancesBatch(allCommands);
 
         return allCommands.stream()
                 .collect(Collectors.groupingBy(
@@ -566,7 +650,7 @@ public class TourService {
                                     for (Command command : commands) {
                                         Double distance = distanceCache.getOrDefault(command.getId(), 0.0);
                                         totalDistance += distance;
-                                        totalPrice += calculateEstimatedTarifWithDistance(command, tarifs, distance);
+                                        totalPrice += calculateEstimatedTarifWithDistance(command, sortedTarifs, distance);
                                     }
 
                                     double averageDistance = orderCount > 0 ? totalDistance / orderCount : 0.0;
@@ -579,7 +663,7 @@ public class TourService {
                                                 return Integer.compare(c1.getTourOrder(), c2.getTourOrder());
                                             })
                                             .map(command -> new PharmacyOrderStatsDTO.CommandStatsDTO(
-                                                    command, tarifs, distanceCache.getOrDefault(command.getId(), 0.0)))
+                                                    command, sortedTarifs, distanceCache.getOrDefault(command.getId(), 0.0)))
                                             .collect(Collectors.toList());
 
                                     return new PharmacyOrderStatsDTO(
@@ -606,15 +690,44 @@ public class TourService {
                 .collect(Collectors.toList());
     }
 
-    private Double calculateEstimatedTarifWithDistance(Command command, List<Tarif> tarifs, Double distance) {
+    private Double calculateEstimatedTarifWithDistance(Command command, List<Tarif> sortedTarifs, Double distance) {
         if (command.getTarif() != null) {
             return command.getTarif();
         }
 
-        Optional<Tarif> matchingTarif = tarifs.stream()
+        // sortedTarifs est pre-trie par kmMax : findFirst remplace filter+min
+        Optional<Tarif> matchingTarif = sortedTarifs.stream()
                 .filter(tarif -> distance <= tarif.getKmMax())
-                .min((t1, t2) -> Double.compare(t1.getKmMax(), t2.getKmMax()));
+                .findFirst();
 
         return matchingTarif.map(Tarif::getPrixEuro).orElse(0.0);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Double> getLoadingTimesByTourIds(List<String> tourIds) {
+        Map<String, Double> loadingTimes = new HashMap<>();
+        if (tourIds == null || tourIds.isEmpty()) {
+            return loadingTimes;
+        }
+
+        List<Object[]> results = historyPackageStatusRepository.findLoadingTimesByTourIds(tourIds);
+        for (Object[] row : results) {
+            String tourId = (String) row[0];
+            Timestamp firstLoaded = (Timestamp) row[1];
+            Timestamp livraisonAt = (Timestamp) row[2];
+
+            if (firstLoaded != null && livraisonAt != null) {
+                long millis = Duration.between(
+                        firstLoaded.toLocalDateTime(),
+                        livraisonAt.toLocalDateTime()
+                ).toMillis();
+                double minutes = BigDecimal.valueOf(millis)
+                        .divide(BigDecimal.valueOf(60000), 2, RoundingMode.HALF_UP)
+                        .doubleValue();
+                loadingTimes.put(tourId, minutes);
+            }
+        }
+
+        return loadingTimes;
     }
 }

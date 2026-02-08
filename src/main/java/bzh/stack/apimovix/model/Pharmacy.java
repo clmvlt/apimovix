@@ -162,6 +162,14 @@ public class Pharmacy {
         return (pharmacyInformations != null) ? pharmacyInformations.getNeverOrdered() : null;
     }
 
+    public Boolean getDoubleCleTransporteur() {
+        return (pharmacyInformations != null) ? pharmacyInformations.getDoubleCleTransporteur() : null;
+    }
+
+    public Boolean getDoubleCleExpediteur() {
+        return (pharmacyInformations != null) ? pharmacyInformations.getDoubleCleExpediteur() : null;
+    }
+
     @OneToMany(mappedBy = "pharmacy", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<PharmacyInformations> pharmacyInformationsList = new ArrayList<>();

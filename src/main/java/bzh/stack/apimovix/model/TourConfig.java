@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 
 /**
@@ -51,6 +52,13 @@ public class TourConfig {
      */
     @Column(nullable = false)
     private Integer recurrence;
+
+    /**
+     * Heure de creation automatique de la tournee (par defaut 08:00)
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalTime tourHour = LocalTime.of(8, 0);
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

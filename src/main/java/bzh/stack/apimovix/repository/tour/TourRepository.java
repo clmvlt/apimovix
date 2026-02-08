@@ -29,6 +29,9 @@ public interface TourRepository extends JpaRepository<Tour, String> {
     List<Tour> findToursOptimizedByDate(@Param("account") Account account, @Param("date") LocalDate date);
 
     @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.profil " +
+           "LEFT JOIN FETCH t.lastHistoryStatus " +
+           "LEFT JOIN FETCH t.zone " +
            "LEFT JOIN FETCH t.commands c " +
            "LEFT JOIN FETCH c.pharmacy p " +
            "WHERE t.initialDate BETWEEN :startDate AND :endDate AND t.account = :account " +
@@ -43,6 +46,9 @@ public interface TourRepository extends JpaRepository<Tour, String> {
     List<Tour> findByProfile(@Param("account") Account account, @Param("profil") Profil profil);
 
     @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.profil " +
+           "LEFT JOIN FETCH t.lastHistoryStatus " +
+           "LEFT JOIN FETCH t.zone " +
            "LEFT JOIN FETCH t.commands c " +
            "LEFT JOIN FETCH c.pharmacy p " +
            "WHERE t.id = :id AND t.account = :account " +
@@ -50,6 +56,8 @@ public interface TourRepository extends JpaRepository<Tour, String> {
     Tour findTour(@Param("account") Account account, @Param("id") String id);
 
     @Query("SELECT DISTINCT t FROM Tour t " +
+           "LEFT JOIN FETCH t.profil " +
+           "LEFT JOIN FETCH t.lastHistoryStatus " +
            "LEFT JOIN FETCH t.commands c " +
            "LEFT JOIN FETCH c.sender s " +
            "LEFT JOIN FETCH s.account " +
@@ -76,6 +84,17 @@ public interface TourRepository extends JpaRepository<Tour, String> {
            "LEFT JOIN FETCH p.pharmacyInformationsList " +
            "WHERE p.cip IN :cips")
     List<bzh.stack.apimovix.model.Pharmacy> loadPharmacyInformationsByCips(@Param("cips") List<String> cips);
+
+    @Query("SELECT c FROM Command c " +
+           "LEFT JOIN FETCH c.pharmacy p " +
+           "LEFT JOIN FETCH p.pharmacyInformationsList " +
+           "LEFT JOIN FETCH c.sender s " +
+           "LEFT JOIN FETCH s.account " +
+           "WHERE c.tour.initialDate BETWEEN :startDate AND :endDate " +
+           "AND c.tour.account = :account " +
+           "AND c.pharmacy IS NOT NULL " +
+           "ORDER BY p.cip")
+    List<bzh.stack.apimovix.model.Command> findCommandsForStats(@Param("account") Account account, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     /**
      * Check if a tour already exists for a given account, name and date

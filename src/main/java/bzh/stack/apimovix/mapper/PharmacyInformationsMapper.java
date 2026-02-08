@@ -38,6 +38,8 @@ public interface PharmacyInformationsMapper {
     @Mapping(target = "firstName", source = "first_name")
     @Mapping(target = "lastName", source = "last_name")
     @Mapping(target = "commentaire", source = "commentaire")
+    @Mapping(target = "doubleCleTransporteur", source = "doubleCleTransporteur")
+    @Mapping(target = "doubleCleExpediteur", source = "doubleCleExpediteur")
     @Mapping(target = "neverOrdered", ignore = true)
     @Mapping(target = "zone", ignore = true)
     @Mapping(target = "account", ignore = true)

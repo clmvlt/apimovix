@@ -1,9 +1,15 @@
 package bzh.stack.apimovix.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +47,7 @@ public class ORSService {
     private static final double DISTANCE_CONVERSION_FACTOR = 100.0;
     private static final double DURATION_CONVERSION_FACTOR = 60.0;
     private static final double ROUNDING_FACTOR = 10.0;
+    private static final ExecutorService DISTANCE_EXECUTOR = Executors.newFixedThreadPool(10);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -462,8 +469,34 @@ public class ORSService {
     }
 
     /**
-     * Calcule la distance en kilomètres entre la pharmacie d'une commande et le compte de l'expéditeur
-     * 
+     * Calcule les distances pour une liste de commandes en parallele (jusqu'a 10 threads simultanes).
+     * Evite les appels HTTP sequentiels vers l'API ORS.
+     *
+     * @param commands La liste des commandes
+     * @return Map commandId -> distance en km
+     */
+    public Map<UUID, Double> calculateCommandDistancesBatch(List<Command> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<UUID, Double> distanceCache = new ConcurrentHashMap<>();
+
+        List<CompletableFuture<Void>> futures = commands.stream()
+            .map(command -> CompletableFuture.runAsync(() -> {
+                distanceCache.put(command.getId(),
+                    calculateCommandDistance(command).orElse(0.0));
+            }, DISTANCE_EXECUTOR))
+            .toList();
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        return distanceCache;
+    }
+
+    /**
+     * Calcule la distance en kilometres entre la pharmacie d'une commande et le compte de l'expediteur
+     *
      * @param command La commande contenant la pharmacie et l'expéditeur
      * @return La distance en kilomètres, ou Optional.empty() en cas d'erreur
      */

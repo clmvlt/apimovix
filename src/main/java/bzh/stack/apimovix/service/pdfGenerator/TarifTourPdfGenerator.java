@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
@@ -79,9 +80,12 @@ public class TarifTourPdfGenerator {
 
         PdfDrawingUtils.drawPageNumber(document, 1, totalPages, font);
 
+        // Pre-calculer toutes les distances en parallele (evite les appels HTTP sequentiels)
+        Map<UUID, Double> distanceCache = orsService.calculateCommandDistancesBatch(tour.getCommands());
+
         // Dessiner chaque commande avec tarif
         for (Command command : tour.getCommands()) {
-            Double distance = orsService.calculateCommandDistance(command).orElse(0.0);
+            Double distance = distanceCache.getOrDefault(command.getId(), 0.0);
             totalDistance += distance;
 
             Optional<Tarif> matchingTarif;

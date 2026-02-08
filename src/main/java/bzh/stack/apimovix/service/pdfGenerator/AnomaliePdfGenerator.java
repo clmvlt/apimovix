@@ -13,10 +13,13 @@ import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
 
 import bzh.stack.apimovix.model.Anomalie;
 import bzh.stack.apimovix.service.picture.PictureService;
@@ -46,8 +49,15 @@ public class AnomaliePdfGenerator {
     public byte[] generateAnomaliePdf(Anomalie anomalie) throws IOException {
         // Récupérer le template PDF
         File templateFile = fileService.findFile("pdf/template_anomalie.pdf");
+        if (anomalie.getAccount().getId().toString().equals("6bce8203-058c-43d4-8c92-fc5cad90acc9")) {
+            templateFile = fileService.findFile("pdf/template_anomalie_mezegel.pdf");
+        } else if (anomalie.getAccount().getId().toString().equals("b73efc9c-1c52-4941-ba6f-93e1d881e399")) {
+            templateFile = fileService.findFile("pdf/template_anomalie_mediane.pdf");
+        }
+        
+        // Si pas de template, generer un PDF basique
         if (templateFile == null || !templateFile.exists()) {
-            throw new IOException("Template PDF d'anomalie non trouvé");
+            return generateBasicPdf(anomalie);
         }
 
         // Créer un nouveau document basé sur le template
@@ -69,6 +79,115 @@ public class AnomaliePdfGenerator {
         }
 
         pdf.close();
+        return baos.toByteArray();
+    }
+
+    /**
+     * Genere un PDF basique sans template avec toutes les informations de l'anomalie
+     */
+    private byte[] generateBasicPdf(Anomalie anomalie) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+        PdfDocument pdf = new PdfDocument(writer);
+        Document document = new Document(pdf, PageSize.A4);
+
+        PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+        PdfFont font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+
+        // Titre
+        document.add(new Paragraph("FICHE D'ANOMALIE")
+                .setFont(fontBold)
+                .setFontSize(18)
+                .setMarginBottom(20));
+
+        // Date et heure
+        String dateHeure = anomalie.getCreatedAt() != null
+                ? anomalie.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                : LocalDateTime.now(ZoneId.of("Europe/Paris")).format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+        document.add(new Paragraph("Date : " + dateHeure).setFont(font).setFontSize(12));
+
+        // Type d'anomalie
+        if (anomalie.getTypeAnomalie() != null) {
+            document.add(new Paragraph("Type d'anomalie : " + anomalie.getTypeAnomalie().getName())
+                    .setFont(font).setFontSize(12));
+        }
+
+        // Autre (si type "other")
+        if (anomalie.getTypeAnomalie() != null && "other".equals(anomalie.getTypeAnomalie().getCode())
+                && anomalie.getOther() != null) {
+            document.add(new Paragraph("Precision : " + anomalie.getOther())
+                    .setFont(font).setFontSize(12));
+        }
+
+        // Comptage des colis
+        if (anomalie.getPackages() != null && !anomalie.getPackages().isEmpty()) {
+            int freshFalseCount = (int) anomalie.getPackages().stream()
+                    .filter(pkg -> pkg.getFresh() != null && !pkg.getFresh())
+                    .count();
+            int freshTrueCount = (int) anomalie.getPackages().stream()
+                    .filter(pkg -> pkg.getFresh() != null && pkg.getFresh())
+                    .count();
+
+            if (freshFalseCount > 0) {
+                document.add(new Paragraph("Colis non frais : " + freshFalseCount)
+                        .setFont(font).setFontSize(12));
+            }
+            if (freshTrueCount > 0) {
+                document.add(new Paragraph("Colis frais : " + freshTrueCount)
+                        .setFont(font).setFontSize(12));
+            }
+        }
+
+        // Pharmacie
+        if (anomalie.getPharmacy() != null) {
+            document.add(new Paragraph("").setMarginTop(10));
+            document.add(new Paragraph("PHARMACIE").setFont(fontBold).setFontSize(14));
+            document.add(new Paragraph(anomalie.getPharmacy().getName() + " (" + anomalie.getPharmacy().getCip() + ")")
+                    .setFont(font).setFontSize(12));
+            document.add(new Paragraph(anomalie.getPharmacy().getFullAdr())
+                    .setFont(font).setFontSize(12));
+            document.add(new Paragraph(anomalie.getPharmacy().getFullCity())
+                    .setFont(font).setFontSize(12));
+        }
+
+        // Actions
+        if (anomalie.getActions() != null && !anomalie.getActions().trim().isEmpty()) {
+            document.add(new Paragraph("").setMarginTop(10));
+            document.add(new Paragraph("ACTIONS").setFont(fontBold).setFontSize(14));
+            document.add(new Paragraph(anomalie.getActions()).setFont(font).setFontSize(12));
+        }
+
+        // Createur
+        if (anomalie.getProfil() != null) {
+            document.add(new Paragraph("").setMarginTop(10));
+            document.add(new Paragraph("Cree par : " + anomalie.getProfil().getFullName())
+                    .setFont(font).setFontSize(12));
+        }
+
+        // Images
+        if (anomalie.getPictures() != null && !anomalie.getPictures().isEmpty()) {
+            document.add(new Paragraph("").setMarginTop(20));
+            document.add(new Paragraph("IMAGES").setFont(fontBold).setFontSize(14));
+
+            for (var picture : anomalie.getPictures()) {
+                try {
+                    File imageFile = pictureService.findImageFile(picture.getName());
+                    if (imageFile != null && imageFile.exists()) {
+                        byte[] imageBytes = java.nio.file.Files.readAllBytes(imageFile.toPath());
+                        com.itextpdf.layout.element.Image img = new com.itextpdf.layout.element.Image(
+                                ImageDataFactory.create(imageBytes));
+                        img.setMaxWidth(400);
+                        img.setMarginTop(10);
+                        document.add(img);
+                    }
+                } catch (Exception e) {
+                    document.add(new Paragraph("Image non disponible : " + picture.getName())
+                            .setFont(font).setFontSize(10));
+                }
+            }
+        }
+
+        document.close();
         return baos.toByteArray();
     }
 

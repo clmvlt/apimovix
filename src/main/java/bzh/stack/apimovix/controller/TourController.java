@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -111,6 +112,11 @@ public class TourController {
         List<TourDTO> tourDTOs = tours.stream()
                 .map(tourMapper::toDto)
                 .collect(Collectors.toList());
+
+        List<String> tourIds = tours.stream().map(Tour::getId).collect(Collectors.toList());
+        Map<String, Double> loadingTimes = tourService.getLoadingTimesByTourIds(tourIds);
+        tourDTOs.forEach(dto -> dto.setLoadingTimeMinutes(loadingTimes.get(dto.getId())));
+
         return MAPIR.ok(tourDTOs);
     }
 

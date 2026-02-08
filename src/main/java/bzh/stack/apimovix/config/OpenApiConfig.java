@@ -66,12 +66,10 @@ public class OpenApiConfig {
         if (isProduction) {
             title = "API Movix - Production";
             description = """
-                **API de gestion pour Movix - Environnement de PRODUCTION**
+                **API de gestion pour Movix**
 
                 - **API** : https://api.movix.fr
-                - **Site** : https://movix.fr
-
-                ⚠️ Cet environnement est en production. Les données sont réelles.""";
+                - **Site** : https://movix.fr""";
             serverDescription = "Serveur de Production";
             securityScheme.description("Format : Bearer {TOKEN_HERE}");
         } else if (isBeta) {
@@ -154,9 +152,9 @@ public class OpenApiConfig {
                                 "SendCommandRequestDTO",
                                 "SendCommandResponseDTO",
                                 "SenderDTO",
+                                "RecipientImporterDTO",
                                 "CommandImporterDTO",
                                 "PackageImporterDTO",
-                                "PharmacyCreateDTO",
                                 "PackageDTO",
                                 "PackageStatusDTO",
                                 "ProfilDTO"

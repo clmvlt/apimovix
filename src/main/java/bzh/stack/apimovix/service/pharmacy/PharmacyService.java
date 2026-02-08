@@ -207,7 +207,7 @@ public class PharmacyService {
             }
         }
 
-        Integer maxResults = pharmacySearchDTO.getMax();
+        Integer maxResults = pharmacySearchDTO.getSize();
         if (maxResults == null || maxResults <= 0) {
             maxResults = 200; // Default value
         }
@@ -238,96 +238,123 @@ public class PharmacyService {
 
     @Transactional(readOnly = true)
     public List<Pharmacy> searchPharmaciesByAccount(Account account, PharmacySearchDTO pharmacySearchDTO) {
-        String name = pharmacySearchDTO.getName();
-        String city = pharmacySearchDTO.getCity();
-        String address = pharmacySearchDTO.getAddress();
+        // Gestion de la pagination
+        Integer page = pharmacySearchDTO.getPage();
+        Integer size = pharmacySearchDTO.getSize();
 
-        if (name != null) {
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (name.toLowerCase().contains(alias.getKey())) {
-                    name = name.toLowerCase().replace(alias.getKey(), alias.getValue());
-                    break;
+        Integer limit = (size != null && size > 0) ? size : 200;
+        Integer offset = (page != null && page > 0) ? page * limit : 0;
+
+        List<String> cips;
+
+        // Mode recherche simple (query) vs mode recherche detaillee
+        if (pharmacySearchDTO.getQuery() != null && !pharmacySearchDTO.getQuery().trim().isEmpty()) {
+            // Recherche globale : split les mots et cherche chaque mot dans tous les champs
+            String[] words = pharmacySearchDTO.getQuery().trim().toLowerCase().split("\\s+");
+            String q1 = words.length > 0 ? words[0] : null;
+            String q2 = words.length > 1 ? words[1] : null;
+            String q3 = words.length > 2 ? words[2] : null;
+            String q4 = words.length > 3 ? words[3] : null;
+            String q5 = words.length > 4 ? words[4] : null;
+
+            cips = pharmacyRepository.searchPharmaciesGlobalByAccount(
+                    account.getId().toString(),
+                    q1, q2, q3, q4, q5,
+                    limit,
+                    offset,
+                    pharmacySearchDTO.getZoneId(),
+                    pharmacySearchDTO.getHasOrdered(),
+                    pharmacySearchDTO.getHasPhotos());
+        } else {
+            // Recherche detaillee : champs separes
+            String name = pharmacySearchDTO.getName();
+            String city = pharmacySearchDTO.getCity();
+            String address = pharmacySearchDTO.getAddress();
+
+            if (name != null) {
+                for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
+                    if (name.toLowerCase().contains(alias.getKey())) {
+                        name = name.toLowerCase().replace(alias.getKey(), alias.getValue());
+                        break;
+                    }
                 }
             }
-        }
 
-        String cityAlias = null;
-        if (city != null) {
-            String cityLower = city.toLowerCase().trim();
+            String cityAlias = null;
+            if (city != null) {
+                String cityLower = city.toLowerCase().trim();
 
-            if (cityLower.startsWith("st ") || cityLower.startsWith("st-")) {
-                cityAlias = cityLower.replaceFirst("^st([\\s-])", "saint$1");
-            } else if (cityLower.equals("st")) {
-                cityAlias = "saint";
-            } else if (cityLower.startsWith("saint ") || cityLower.startsWith("saint-")) {
-                cityAlias = cityLower.replaceFirst("^saint([\\s-])", "st$1");
-            } else if (cityLower.equals("saint")) {
-                cityAlias = "st";
-            } else if (cityLower.startsWith("ste ") || cityLower.startsWith("ste-")) {
-                cityAlias = cityLower.replaceFirst("^ste([\\s-])", "sainte$1");
-            } else if (cityLower.equals("ste")) {
-                cityAlias = "sainte";
-            } else if (cityLower.startsWith("sainte ") || cityLower.startsWith("sainte-")) {
-                cityAlias = cityLower.replaceFirst("^sainte([\\s-])", "ste$1");
-            } else if (cityLower.equals("sainte")) {
-                cityAlias = "ste";
-            }
+                if (cityLower.startsWith("st ") || cityLower.startsWith("st-")) {
+                    cityAlias = cityLower.replaceFirst("^st([\\s-])", "saint$1");
+                } else if (cityLower.equals("st")) {
+                    cityAlias = "saint";
+                } else if (cityLower.startsWith("saint ") || cityLower.startsWith("saint-")) {
+                    cityAlias = cityLower.replaceFirst("^saint([\\s-])", "st$1");
+                } else if (cityLower.equals("saint")) {
+                    cityAlias = "st";
+                } else if (cityLower.startsWith("ste ") || cityLower.startsWith("ste-")) {
+                    cityAlias = cityLower.replaceFirst("^ste([\\s-])", "sainte$1");
+                } else if (cityLower.equals("ste")) {
+                    cityAlias = "sainte";
+                } else if (cityLower.startsWith("sainte ") || cityLower.startsWith("sainte-")) {
+                    cityAlias = cityLower.replaceFirst("^sainte([\\s-])", "ste$1");
+                } else if (cityLower.equals("sainte")) {
+                    cityAlias = "ste";
+                }
 
-            if (cityAlias == null) {
-                String[] parts = cityLower.split("\\s+");
-                if (parts.length > 1) {
-                    boolean modified = false;
-                    for (int i = 0; i < parts.length; i++) {
-                        String part = parts[i];
-                        if (part.equals("st") || part.equals("st-")) {
-                            parts[i] = part.replace("st", "saint");
-                            modified = true;
-                        } else if (part.equals("saint") || part.equals("saint-")) {
-                            parts[i] = part.replace("saint", "st");
-                            modified = true;
-                        } else if (part.equals("ste") || part.equals("ste-")) {
-                            parts[i] = part.replace("ste", "sainte");
-                            modified = true;
-                        } else if (part.equals("sainte") || part.equals("sainte-")) {
-                            parts[i] = part.replace("sainte", "ste");
-                            modified = true;
+                if (cityAlias == null) {
+                    String[] parts = cityLower.split("\\s+");
+                    if (parts.length > 1) {
+                        boolean modified = false;
+                        for (int i = 0; i < parts.length; i++) {
+                            String part = parts[i];
+                            if (part.equals("st") || part.equals("st-")) {
+                                parts[i] = part.replace("st", "saint");
+                                modified = true;
+                            } else if (part.equals("saint") || part.equals("saint-")) {
+                                parts[i] = part.replace("saint", "st");
+                                modified = true;
+                            } else if (part.equals("ste") || part.equals("ste-")) {
+                                parts[i] = part.replace("ste", "sainte");
+                                modified = true;
+                            } else if (part.equals("sainte") || part.equals("sainte-")) {
+                                parts[i] = part.replace("sainte", "ste");
+                                modified = true;
+                            }
+                        }
+                        if (modified) {
+                            cityAlias = String.join(" ", parts);
                         }
                     }
-                    if (modified) {
-                        cityAlias = String.join(" ", parts);
+                }
+            }
+
+            if (address != null) {
+                for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
+                    if (address.toLowerCase().contains(alias.getKey())) {
+                        address = address.toLowerCase().replace(alias.getKey(), alias.getValue());
+                        break;
                     }
                 }
             }
-        }
 
-        if (address != null) {
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (address.toLowerCase().contains(alias.getKey())) {
-                    address = address.toLowerCase().replace(alias.getKey(), alias.getValue());
-                    break;
-                }
-            }
+            // Utiliser la requete native qui supporte tous les filtres (zoneId, hasOrdered)
+            // Cette requete retourne les CIPs des pharmacies correspondant aux criteres
+            cips = pharmacyRepository.searchPharmaciesCipsByAccount(
+                    account.getId().toString(),
+                    name,
+                    city,
+                    cityAlias,
+                    pharmacySearchDTO.getPostalCode(),
+                    pharmacySearchDTO.getCip(),
+                    address,
+                    pharmacySearchDTO.getIsLocationValid(),
+                    limit,
+                    offset,
+                    pharmacySearchDTO.getZoneId(),
+                    pharmacySearchDTO.getHasOrdered(),
+                    pharmacySearchDTO.getHasPhotos());
         }
-
-        Integer maxResults = pharmacySearchDTO.getMax();
-        if (maxResults == null || maxResults <= 0) {
-            maxResults = 200; // Default value
-        }
-
-        // Utiliser la requête native qui supporte tous les filtres (zoneId, hasOrdered)
-        // Cette requête retourne les CIPs des pharmacies correspondant aux critères
-        List<String> cips = pharmacyRepository.searchPharmaciesCipsByAccount(
-                account.getId().toString(),
-                name,
-                city,
-                cityAlias,
-                pharmacySearchDTO.getPostalCode(),
-                pharmacySearchDTO.getCip(),
-                address,
-                pharmacySearchDTO.getIsLocationValid(),
-                maxResults,
-                pharmacySearchDTO.getZoneId(),
-                pharmacySearchDTO.getHasOrdered());
 
         if (cips.isEmpty()) {
             return new java.util.ArrayList<>();
@@ -485,6 +512,8 @@ public class PharmacyService {
             pharmacyInformations.setFirstName(pharmacyDTO.getFirst_name());
             pharmacyInformations.setLastName(pharmacyDTO.getLast_name());
             pharmacyInformations.setCommentaire(pharmacyDTO.getCommentaire());
+            pharmacyInformations.setDoubleCleTransporteur(pharmacyDTO.getDoubleCleTransporteur());
+            pharmacyInformations.setDoubleCleExpediteur(pharmacyDTO.getDoubleCleExpediteur());
             pharmacyInformations.setNeverOrdered(true);
 
             // Associer la zone si elle existe

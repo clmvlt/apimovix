@@ -21,14 +21,17 @@ import bzh.stack.apimovix.model.Picture.AnomaliePicture;
     componentModel = "spring",
     unmappedTargetPolicy = ReportingPolicy.IGNORE,
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {ProfileMapper.class, PharmacyMapper.class, PackageMapper.class}
+    uses = {ProfileMapper.class, PharmacyMapper.class, PackageMapper.class, CommandMapper.class}
 )
 @Component
 public interface AnomalieMapper {
-    
+
+    @Mapping(target = "commandId", source = "command.id")
     AnomalieDTO toDto(Anomalie anomalie);
-    
+
     @Mapping(target = "pictures", expression = "java(mapPictures(anomalie.getPictures()))")
+    @Mapping(target = "commandId", source = "command.id")
+    @Mapping(target = "command", source = "command")
     AnomalieDetailDTO toDetailDto(Anomalie anomalie);
     
     Anomalie toEntity(AnomalieDTO dto);

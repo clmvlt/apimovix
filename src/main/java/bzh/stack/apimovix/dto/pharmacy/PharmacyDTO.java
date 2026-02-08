@@ -29,6 +29,8 @@ public class PharmacyDTO {
     private String lastName;
     private Boolean neverOrdered;
     private String commentaire;
+    private Boolean doubleCleTransporteur;
+    private Boolean doubleCleExpediteur;
     private ZoneDTO zone;
     private UUID accountId;
 
@@ -55,6 +57,8 @@ public class PharmacyDTO {
         this.lastName = pharmacy.getLastName();
         this.neverOrdered = pharmacy.getNeverOrdered();
         this.commentaire = pharmacy.getCommentaire();
+        this.doubleCleTransporteur = pharmacy.getDoubleCleTransporteur();
+        this.doubleCleExpediteur = pharmacy.getDoubleCleExpediteur();
 
         // Zone et Account viennent uniquement de pharmacyInformations
         if (pharmacy.getZone() != null) {

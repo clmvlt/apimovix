@@ -17,4 +17,5 @@ public class AnomalieDTO {
     private PharmacyDTO pharmacy;
     private TypeAnomalie typeAnomalie;
     private ProfilDTO profil;
+    private UUID commandId;
 } 

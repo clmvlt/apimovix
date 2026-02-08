@@ -34,6 +34,8 @@ public class TourDTO {
     private Double estimateKm;
     private String geometry;
 
+    private Double loadingTimeMinutes;
+
     private ProfilDTO profil;
     private TourStatusDTO status;
     private ZoneDTO zone;

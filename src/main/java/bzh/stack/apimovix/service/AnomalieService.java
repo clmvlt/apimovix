@@ -82,60 +82,92 @@ public class AnomalieService {
 
     @Transactional(readOnly = true)
     public List<Anomalie> searchAnomalies(Account account, AnomalieSearchDTO searchDTO) {
-        // Vérifier si des dates sont fournies
+        // Gestion de la pagination
+        Integer page = searchDTO.getPage();
+        Integer size = searchDTO.getSize();
+
+        Integer limit = (size != null && size > 0) ? size : 200;
+        Integer offset = (page != null && page > 0) ? page * limit : 0;
+
+        // Verifier si des dates sont fournies
         boolean hasDateDebut = searchDTO.getDateDebut() != null && !searchDTO.getDateDebut().isEmpty();
         boolean hasDateFin = searchDTO.getDateFin() != null && !searchDTO.getDateFin().isEmpty();
 
-        Integer maxResults = searchDTO.getMax();
-        if (maxResults == null || maxResults <= 0) {
-            maxResults = 200;
-        }
-
-        List<Anomalie> results;
+        // Conversion des dates si necessaire
+        LocalDateTime dateDebut = null;
+        LocalDateTime dateFin = null;
 
         if (hasDateDebut || hasDateFin) {
-            // Conversion des dates
-            LocalDateTime dateDebut = null;
-            LocalDateTime dateFin = null;
-
             if (hasDateDebut) {
                 LocalDate debut = LocalDate.parse(searchDTO.getDateDebut());
                 dateDebut = debut.atStartOfDay();
             } else {
-                // Si pas de date de début, utiliser une date très ancienne
                 dateDebut = LocalDateTime.of(1900, 1, 1, 0, 0);
             }
 
             if (hasDateFin) {
                 LocalDate fin = LocalDate.parse(searchDTO.getDateFin());
-                dateFin = fin.atTime(LocalTime.MAX); // Fin de la journée
+                dateFin = fin.atTime(LocalTime.MAX);
             } else {
-                // Si pas de date de fin, utiliser une date très future
                 dateFin = LocalDateTime.of(2100, 12, 31, 23, 59, 59);
             }
+        }
 
-            results = anomalieRepository.searchAnomaliesWithDateRange(
-                account,
-                searchDTO.getUserId(),
-                dateDebut,
-                dateFin,
-                searchDTO.getCip(),
-                searchDTO.getTypeCode()
-            );
+        // Mode recherche simple (query) vs mode recherche detaillee
+        if (searchDTO.getQuery() != null && !searchDTO.getQuery().trim().isEmpty()) {
+            // Recherche globale : split les mots et cherche chaque mot dans tous les champs
+            String[] words = searchDTO.getQuery().trim().toLowerCase().split("\\s+");
+            String q1 = words.length > 0 ? words[0] : null;
+            String q2 = words.length > 1 ? words[1] : null;
+            String q3 = words.length > 2 ? words[2] : null;
+            String q4 = words.length > 3 ? words[3] : null;
+            String q5 = words.length > 4 ? words[4] : null;
+
+            if (hasDateDebut || hasDateFin) {
+                return anomalieRepository.searchAnomaliesGlobalWithDateRange(
+                    account,
+                    searchDTO.getUserId(),
+                    dateDebut,
+                    dateFin,
+                    searchDTO.getTypeCode(),
+                    q1, q2, q3, q4, q5,
+                    limit,
+                    offset
+                );
+            } else {
+                return anomalieRepository.searchAnomaliesGlobal(
+                    account,
+                    searchDTO.getUserId(),
+                    searchDTO.getTypeCode(),
+                    q1, q2, q3, q4, q5,
+                    limit,
+                    offset
+                );
+            }
         } else {
-            // Pas de filtres de date
-            results = anomalieRepository.searchAnomalies(
-                account,
-                searchDTO.getUserId(),
-                searchDTO.getCip(),
-                searchDTO.getTypeCode()
-            );
+            // Recherche detaillee
+            if (hasDateDebut || hasDateFin) {
+                return anomalieRepository.searchAnomaliesWithDateRange(
+                    account,
+                    searchDTO.getUserId(),
+                    dateDebut,
+                    dateFin,
+                    searchDTO.getCip(),
+                    searchDTO.getTypeCode(),
+                    limit,
+                    offset
+                );
+            } else {
+                return anomalieRepository.searchAnomalies(
+                    account,
+                    searchDTO.getUserId(),
+                    searchDTO.getCip(),
+                    searchDTO.getTypeCode(),
+                    limit,
+                    offset
+                );
+            }
         }
-
-        if (results.size() > maxResults) {
-            return results.subList(0, maxResults);
-        }
-        return results;
     }
 
     @Transactional
@@ -159,6 +191,11 @@ public class AnomalieService {
         anomalie.setProfil(profil);
         anomalie.setTypeAnomalie(typeAnomalieOptional.get());
         anomalie.setPharmacy(pharmacyOptional.get());
+
+        // Associer la commande depuis le premier package
+        if (!packages.isEmpty() && packages.get(0).getCommand() != null) {
+            anomalie.setCommand(packages.get(0).getCommand());
+        }
 
         anomalie.getPackages().addAll(packages);
 
@@ -275,5 +312,20 @@ public class AnomalieService {
             pictureService.deleteImage(fileName);
             return Optional.empty();
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Anomalie> findByCommandId(UUID commandId) {
+        return anomalieRepository.findByCommandId(commandId);
+    }
+
+    @Transactional
+    public void addPictureToAnomalie(Anomalie anomalie, String imagePath) {
+        AnomaliePicture picture = new AnomaliePicture();
+        picture.setName(imagePath);
+        picture.setAnomalie(anomalie);
+        anomaliePictureRepository.save(picture);
+        anomalie.getPictures().add(picture);
+        anomalieRepository.save(anomalie);
     }
 } 

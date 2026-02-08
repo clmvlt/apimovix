@@ -90,6 +90,12 @@ public class PharmacyInformations {
     @Column(name = "commentaire", length = 4000)
     private String commentaire;
 
+    @Column(name = "double_cle_transporteur")
+    private Boolean doubleCleTransporteur;
+
+    @Column(name = "double_cle_expediteur")
+    private Boolean doubleCleExpediteur;
+
     @ManyToOne
     @JoinColumn(name = "id_zone")
     private Zone zone;

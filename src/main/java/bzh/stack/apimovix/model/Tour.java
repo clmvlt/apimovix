@@ -9,6 +9,8 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
+import org.hibernate.annotations.BatchSize;
+
 import bzh.stack.apimovix.model.History.HistoryTourStatus;
 import bzh.stack.apimovix.util.PATTERNS;
 import jakarta.persistence.Column;
@@ -87,6 +89,7 @@ public class Tour {
 
     @OneToMany(mappedBy = "tour", fetch = FetchType.EAGER)
     @JsonManagedReference
+    @BatchSize(size = 20)
     private List<Command> commands = new ArrayList<>();
 
     @Override

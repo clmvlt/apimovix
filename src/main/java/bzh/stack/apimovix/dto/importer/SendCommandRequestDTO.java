@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
-import bzh.stack.apimovix.dto.pharmacy.PharmacyCreateDTO;
 import bzh.stack.apimovix.util.GLOBAL;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -24,7 +23,7 @@ public class SendCommandRequestDTO {
 
     @NotNull(message = GLOBAL.REQUIRED)
     @Schema(description = "Informations sur le destinataire (pharmacie)")
-    private PharmacyCreateDTO recipient;
+    private RecipientImporterDTO recipient;
 
     @NotNull(message = GLOBAL.REQUIRED)
     @Schema(description = "Détails de la commande et des colis")

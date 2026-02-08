@@ -13,6 +13,7 @@ import bzh.stack.apimovix.dto.importer.SendCommandRequestDTO;
 import bzh.stack.apimovix.dto.importer.SendCommandResponseDTO;
 import bzh.stack.apimovix.dto.packageentity.PackageDTO;
 import bzh.stack.apimovix.mapper.PackageMapper;
+import bzh.stack.apimovix.dto.importer.RecipientImporterDTO;
 import bzh.stack.apimovix.dto.pharmacy.PharmacyCreateDTO;
 import bzh.stack.apimovix.model.Account;
 import bzh.stack.apimovix.model.Command;
@@ -20,7 +21,6 @@ import bzh.stack.apimovix.model.PackageEntity;
 import bzh.stack.apimovix.model.Pharmacy;
 import bzh.stack.apimovix.model.PharmacyInformations;
 import bzh.stack.apimovix.model.Sender;
-import bzh.stack.apimovix.model.Todo;
 import bzh.stack.apimovix.model.Tour;
 import bzh.stack.apimovix.service.command.CommandService;
 import bzh.stack.apimovix.service.packageservices.PackageService;
@@ -42,7 +42,6 @@ public class ImporterService {
     private final TourService tourService;
     private final TourCommandService tourCommandService;
     private final PackageMapper packageMapper;
-    private final TodoService todoService;
 
     @Transactional
     public SendCommandResponseDTO sendCommand(@Valid SendCommandRequestDTO body) {
@@ -58,7 +57,7 @@ public class ImporterService {
                 pharmacy = optPharmacy.get();
             } else {
                 // Si la pharmacy n'existe pas, on l'associe au compte du sender
-                PharmacyCreateDTO pharmacyDTO = body.getRecipient();
+                PharmacyCreateDTO pharmacyDTO = convertToPharmacyCreateDTO(body.getRecipient());
                 pharmacy = pharmacyService.createPharmacy(sender.getAccount(), pharmacyDTO);
             }
 
@@ -85,6 +84,29 @@ public class ImporterService {
         }
     }
 
+    private PharmacyCreateDTO convertToPharmacyCreateDTO(RecipientImporterDTO recipient) {
+        PharmacyCreateDTO dto = new PharmacyCreateDTO();
+        dto.setCip(recipient.getCip());
+        dto.setName(recipient.getName());
+        dto.setAddress1(recipient.getAddress1());
+        dto.setAddress2(recipient.getAddress2());
+        dto.setAddress3(recipient.getAddress3());
+        dto.setPostal_code(recipient.getPostal_code());
+        dto.setCity(recipient.getCity());
+        dto.setCountry(recipient.getCountry());
+        dto.setInformations(recipient.getInformations());
+        dto.setPhone(recipient.getPhone());
+        dto.setFax(recipient.getFax());
+        dto.setEmail(recipient.getEmail());
+        dto.setLatitude(recipient.getLatitude());
+        dto.setLongitude(recipient.getLongitude());
+        dto.setQuality(recipient.getQuality());
+        dto.setFirst_name(recipient.getFirst_name());
+        dto.setLast_name(recipient.getLast_name());
+        dto.setCommentaire(recipient.getCommentaire());
+        return dto;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     protected Command createOrUpdateCommand(Pharmacy pharmacy, Sender sender, SendCommandRequestDTO body) {
         Optional<Command> optCommand = commandService.findPharmacyCommandByDate(sender.getAccount(), pharmacy.getCip(), body.getExpedition_date());
@@ -104,10 +126,16 @@ public class ImporterService {
             pharmacy.setPharmacyInformations(pharmacyInfo);
             pharmacy = pharmacyService.save(pharmacy);
 
-            // Créer un TODO pour l'account spécifique si c'est une nouvelle pharmacie
-            if (newPharmacy && sender.getAccount() != null &&
-                "6bce8203-058c-43d4-8c92-fc5cad90acc9".equals(sender.getAccount().getId().toString())) {
-                createNewPharmacyTodo(pharmacy);
+            // Ajouter un commentaire dans PharmacyInformations si c'est une nouvelle pharmacie
+            if (newPharmacy) {
+                String comment = "Nouvelle pharmacie - Cle a avoir";
+                if (pharmacyInfo.getCommentaire() == null || pharmacyInfo.getCommentaire().isEmpty()) {
+                    pharmacyInfo.setCommentaire(comment);
+                } else if (!pharmacyInfo.getCommentaire().contains("Cle a avoir")) {
+                    pharmacyInfo.setCommentaire(pharmacyInfo.getCommentaire() + "\n" + comment);
+                }
+                pharmacy.setPharmacyInformations(pharmacyInfo);
+                pharmacy = pharmacyService.save(pharmacy);
             }
 
             return commandService.createCommand(pharmacy, sender, null, body.getCommand(),
@@ -200,18 +228,4 @@ public class ImporterService {
         }
     }
 
-    private void createNewPharmacyTodo(Pharmacy pharmacy) {
-        try {
-            Todo todo = new Todo();
-            todo.setTitle("Nouvelle pharmacie - Étiquette et clé");
-            todo.setDescription("Étiquette à poser et clé à avoir pour la pharmacie: " +
-                pharmacy.getName() + " (CIP: " + pharmacy.getCip() + ")");
-            todo.setCompleted(false);
-            todoService.createTodo(todo);
-            log.info("TODO created for new pharmacy: {}", pharmacy.getCip());
-        } catch (Exception e) {
-            log.error("Error creating TODO for new pharmacy", e);
-            // Ne pas propager l'erreur pour ne pas bloquer la création de la commande
-        }
-    }
 }

@@ -323,61 +323,7 @@ public class CommandService {
     public List<CommandExpeditionDTO> findExpeditionCommands(Account account, LocalDateTime date) {
         LocalDateTime startDate = date.toLocalDate().atStartOfDay();
         LocalDateTime endDate = startDate.plusDays(1);
-
-        // Charger les entités Command complètes avec leurs pharmacies
-        List<Command> commands = commandRepository.findExpeditionCommandsEntities(account, startDate, endDate);
-
-        // Charger les PharmacyInformations pour chaque pharmacy
-        commands.forEach(command -> {
-            if (command.getPharmacy() != null) {
-                command.getPharmacy().loadPharmacyInformationsForAccount(account.getId());
-            }
-        });
-
-        // Convertir en DTOs
-        return commands.stream()
-            .map(command -> {
-                // Compter les packages
-                Long packagesNumber = (long) (command.getPackages() != null ? command.getPackages().size() : 0);
-                // Calculer le poids total
-                Double totalWeight = command.getPackages() != null
-                    ? command.getPackages().stream()
-                        .filter(p -> p.getWeight() != null)
-                        .mapToDouble(p -> p.getWeight())
-                        .sum()
-                    : 0.0;
-
-                // Créer le PharmacyDTO avec les données qui incluent maintenant les PharmacyInformations
-                bzh.stack.apimovix.dto.pharmacy.PharmacyDTO pharmacyDTO = null;
-                if (command.getPharmacy() != null) {
-                    pharmacyDTO = new bzh.stack.apimovix.dto.pharmacy.PharmacyDTO(
-                        command.getPharmacy().getCip(),
-                        command.getPharmacy().getName(),
-                        command.getPharmacy().getAddress1(), // Utilise les getters qui appliquent PharmacyInformations
-                        command.getPharmacy().getCity(),
-                        command.getPharmacy().getPostalCode(),
-                        command.getPharmacy().getLatitude(),
-                        command.getPharmacy().getLongitude()
-                    );
-                }
-
-                return new CommandExpeditionDTO(
-                    command.getId(),
-                    command.getCloseDate(),
-                    command.getTourOrder(),
-                    command.getExpDate(),
-                    command.getComment(),
-                    command.getNewPharmacy(),
-                    command.getLatitude(),
-                    command.getLongitude(),
-                    command.getTour(),
-                    packagesNumber,
-                    totalWeight,
-                    pharmacyDTO,
-                    command.getLastHistoryStatus() != null ? command.getLastHistoryStatus().getStatus() : null
-                );
-            })
-            .collect(Collectors.toList());
+        return commandRepository.findExpeditionCommandsOptimized(account, startDate, endDate);
     }
 
     public Optional<Command> findById(Account account, UUID id) {
@@ -412,6 +358,12 @@ public class CommandService {
 
                 command.getPictures().add(picture);
                 commandRepository.save(command);
+
+                // Ajouter l'image aux anomalies liees a cette commande
+                var anomalies = anomalieService.findByCommandId(command.getId());
+                for (var anomalie : anomalies) {
+                    anomalieService.addPictureToAnomalie(anomalie, fileName);
+                }
             } catch (Exception e) {
                 pictureService.deleteImage(fileName);
             }
@@ -422,46 +374,17 @@ public class CommandService {
 
     @Transactional(readOnly = true)
     public List<CommandSearchResponseDTO> searchCommands(Account account, CommandSearchDTO searchDTO) {
-        String name = searchDTO.getPharmacyName();
-        String city = searchDTO.getPharmacyCity();
-        String address = searchDTO.getPharmacyAddress();
+        // Gestion de la pagination
+        Integer page = searchDTO.getPage();
+        Integer size = searchDTO.getSize();
 
-        // Convertir en minuscules pour la recherche insensible à la casse
-        if (name != null) {
-            name = name.toLowerCase();
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (name.contains(alias.getKey())) {
-                    name = name.replace(alias.getKey(), alias.getValue());
-                    break;
-                }
-            }
-        }
+        Integer limit = (size != null && size > 0) ? size : 200;
+        Integer offset = (page != null && page > 0) ? page * limit : 0;
 
-        if (city != null) {
-            city = city.toLowerCase();
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (city.contains(alias.getKey())) {
-                    city = city.replace(alias.getKey(), alias.getValue());
-                    break;
-                }
-            }
-        }
-
-        if (address != null) {
-            address = address.toLowerCase();
-            for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
-                if (address.contains(alias.getKey())) {
-                    address = address.replace(alias.getKey(), alias.getValue());
-                    break;
-                }
-            }
-        }
-
-        String commandId = searchDTO.getCommandId();
-        
+        // Gestion des dates
         LocalDateTime startDate = searchDTO.getStartDate();
         LocalDateTime endDate = searchDTO.getEndDate();
-        
+
         if (startDate != null && endDate == null) {
             endDate = LocalDateTime.now().toLocalDate().atTime(23, 59, 59);
         } else if (startDate == null) {
@@ -470,38 +393,96 @@ public class CommandService {
             endDate = endDate.toLocalDate().atTime(23, 59, 59);
         }
 
-        Integer maxResults = searchDTO.getMax();
-        if (maxResults == null || maxResults <= 0) {
-            maxResults = 200;
-        }
+        // Mode recherche simple (query) vs mode recherche detaillee
+        if (searchDTO.getQuery() != null && !searchDTO.getQuery().trim().isEmpty()) {
+            // Recherche globale : split les mots et cherche chaque mot dans tous les champs
+            String[] words = searchDTO.getQuery().trim().toLowerCase().split("\\s+");
+            String q1 = words.length > 0 ? words[0] : null;
+            String q2 = words.length > 1 ? words[1] : null;
+            String q3 = words.length > 2 ? words[2] : null;
+            String q4 = words.length > 3 ? words[3] : null;
+            String q5 = words.length > 4 ? words[4] : null;
 
-        List<CommandSearchResponseDTO> results;
-        if (startDate == null) {
-            results = commandRepository.searchCommandsWithoutDates(
-                    account,
-                    name,
-                    city,
-                    searchDTO.getPharmacyCip(),
-                    searchDTO.getPharmacyPostalCode(),
-                    address,
-                    commandId);
+            if (startDate == null) {
+                return commandRepository.searchCommandsGlobalWithoutDates(
+                        account,
+                        q1, q2, q3, q4, q5,
+                        limit,
+                        offset);
+            } else {
+                return commandRepository.searchCommandsGlobalWithDates(
+                        account,
+                        q1, q2, q3, q4, q5,
+                        startDate,
+                        endDate,
+                        limit,
+                        offset);
+            }
         } else {
-            results = commandRepository.searchCommandsWithDates(
-                    account,
-                    name,
-                    city,
-                    searchDTO.getPharmacyCip(),
-                    searchDTO.getPharmacyPostalCode(),
-                    address,
-                    commandId,
-                    startDate,
-                    endDate);
-        }
+            // Recherche detaillee
+            String name = searchDTO.getPharmacyName();
+            String city = searchDTO.getPharmacyCity();
+            String address = searchDTO.getPharmacyAddress();
 
-        if (results.size() > maxResults) {
-            return results.subList(0, maxResults);
+            // Convertir en minuscules pour la recherche insensible a la casse
+            if (name != null) {
+                name = name.toLowerCase();
+                for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
+                    if (name.contains(alias.getKey())) {
+                        name = name.replace(alias.getKey(), alias.getValue());
+                        break;
+                    }
+                }
+            }
+
+            if (city != null) {
+                city = city.toLowerCase();
+                for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
+                    if (city.contains(alias.getKey())) {
+                        city = city.replace(alias.getKey(), alias.getValue());
+                        break;
+                    }
+                }
+            }
+
+            if (address != null) {
+                address = address.toLowerCase();
+                for (Map.Entry<String, String> alias : GLOBAL.SEARCH_ALIASES.entrySet()) {
+                    if (address.contains(alias.getKey())) {
+                        address = address.replace(alias.getKey(), alias.getValue());
+                        break;
+                    }
+                }
+            }
+
+            String commandId = searchDTO.getCommandId();
+
+            if (startDate == null) {
+                return commandRepository.searchCommandsWithoutDates(
+                        account,
+                        name,
+                        city,
+                        searchDTO.getPharmacyCip(),
+                        searchDTO.getPharmacyPostalCode(),
+                        address,
+                        commandId,
+                        limit,
+                        offset);
+            } else {
+                return commandRepository.searchCommandsWithDates(
+                        account,
+                        name,
+                        city,
+                        searchDTO.getPharmacyCip(),
+                        searchDTO.getPharmacyPostalCode(),
+                        address,
+                        commandId,
+                        startDate,
+                        endDate,
+                        limit,
+                        offset);
+            }
         }
-        return results;
     }
 
     @Transactional

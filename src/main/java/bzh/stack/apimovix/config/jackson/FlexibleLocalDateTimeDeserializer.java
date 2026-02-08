@@ -56,11 +56,11 @@ public class FlexibleLocalDateTimeDeserializer extends JsonDeserializer<LocalDat
             // continue
         }
 
-        // Essai format date seule
+        // Essai format date seule - si pas d'heure, on met 8h par defaut
         try {
             if (value.length() == 10) {
                 LocalDate date = LocalDate.parse(value, FORMAT_DATE);
-                return date.atStartOfDay();
+                return date.atTime(8, 0);
             }
         } catch (DateTimeParseException ignored) {
             // continue

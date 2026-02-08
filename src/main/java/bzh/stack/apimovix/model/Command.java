@@ -17,6 +17,8 @@ import bzh.stack.apimovix.dto.importer.CommandImporterDTO;
 import bzh.stack.apimovix.model.History.HistoryCommandStatus;
 import bzh.stack.apimovix.model.Picture.CommandPicture;
 import bzh.stack.apimovix.util.PATTERNS;
+import org.hibernate.annotations.BatchSize;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -99,10 +101,12 @@ public class Command {
 
     @OneToMany(mappedBy = "command", fetch = FetchType.EAGER)
     @JsonManagedReference
+    @BatchSize(size = 50)
     private List<CommandPicture> pictures = new ArrayList<>();
 
     @OneToMany(mappedBy = "command", fetch = FetchType.EAGER)
     @JsonManagedReference
+    @BatchSize(size = 50)
     private List<PackageEntity> packages = new ArrayList<>();
 
     @Override

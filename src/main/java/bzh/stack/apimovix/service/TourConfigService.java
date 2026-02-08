@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -44,6 +45,11 @@ public class TourConfigService {
 
         TourConfig tourConfig = tourConfigMapper.toEntity(createDTO);
         tourConfig.setAccount(account);
+
+        // Appliquer l'heure par defaut (08:00) si non fournie
+        if (tourConfig.getTourHour() == null) {
+            tourConfig.setTourHour(LocalTime.of(8, 0));
+        }
 
         TourConfig savedConfig = tourConfigRepository.save(tourConfig);
         return tourConfigMapper.toDetailDTO(savedConfig);

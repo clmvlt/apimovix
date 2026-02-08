@@ -9,18 +9,28 @@ import lombok.Data;
 
 @Data
 public class CommandSearchDTO {
+    /**
+     * Recherche simple : un seul champ qui cherche dans tous les elements
+     * (nom pharmacie, ville, code postal, cip, adresse, id commande)
+     * Si ce champ est renseigne, les champs detailles sont ignores
+     */
+    private String query;
+
+    // Champs detailles pour la recherche avancee
     private String pharmacyName;
     private String pharmacyCity;
-    private String pharmacyCip ;
+    private String pharmacyCip;
     private String pharmacyPostalCode;
     private String pharmacyAddress;
     private String commandId;
-    
+
     @JsonFormat(pattern = PATTERNS.DATETIME)
     private LocalDateTime startDate;
 
     @JsonFormat(pattern = PATTERNS.DATETIME)
     private LocalDateTime endDate;
 
-    private Integer max;
+    // Pagination
+    private Integer page;
+    private Integer size;
 } 

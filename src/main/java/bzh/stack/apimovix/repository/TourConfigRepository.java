@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,6 +29,15 @@ public interface TourConfigRepository extends JpaRepository<TourConfig, UUID> {
                    "INNER JOIN account a ON tc.account_id = a.id " +
                    "WHERE (tc.recurrence & :dayBit) > 0", nativeQuery = true)
     List<TourConfig> findByActiveDay(@Param("dayBit") int dayBit);
+
+    /**
+     * Récupère les configurations actives pour un jour et une heure donnés
+     */
+    @Query(value = "SELECT tc.* FROM tour_configs tc " +
+                   "INNER JOIN account a ON tc.account_id = a.id " +
+                   "WHERE (tc.recurrence & :dayBit) > 0 " +
+                   "AND tc.tour_hour = :tourHour", nativeQuery = true)
+    List<TourConfig> findByActiveDayAndHour(@Param("dayBit") int dayBit, @Param("tourHour") LocalTime tourHour);
 
     /**
      * Récupère les configurations par zone

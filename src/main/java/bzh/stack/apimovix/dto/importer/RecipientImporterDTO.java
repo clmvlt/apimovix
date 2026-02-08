@@ -1,6 +1,6 @@
-package bzh.stack.apimovix.dto.pharmacy;
+package bzh.stack.apimovix.dto.importer;
 
-import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import bzh.stack.apimovix.util.GLOBAL;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -10,8 +10,9 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-@Schema(description = "Informations sur le destinataire (pharmacie)")
-public class PharmacyCreateDTO {
+@JsonIgnoreProperties(ignoreUnknown = true)
+@Schema(description = "Informations sur le destinataire (pharmacie) pour l'import de commande")
+public class RecipientImporterDTO {
     @NotNull(message = GLOBAL.REQUIRED)
     @NotEmpty(message = GLOBAL.CANNOT_BE_EMPTY)
     @Schema(description = "Code CIP de la pharmacie", example = "2111281", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -69,16 +70,4 @@ public class PharmacyCreateDTO {
     @Size(max = 4000, message = "Le commentaire ne peut pas dépasser 4000 caractères")
     @Schema(description = "Commentaire sur la pharmacie")
     private String commentaire;
-
-    @Schema(description = "Double cle transporteur")
-    private Boolean doubleCleTransporteur;
-
-    @Schema(description = "Double cle expediteur")
-    private Boolean doubleCleExpediteur;
-
-    @Schema(description = "Identifiant de la zone de livraison")
-    private UUID zoneId;
-
-    @Schema(description = "Identifiant du compte associé")
-    private UUID accountId;
-} 
+}
